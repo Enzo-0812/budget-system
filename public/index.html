@@ -84,7 +84,6 @@
         <button class="tab" data-view="budget">预算设置</button>
       </div>
 
-      <!-- 预算申请页面 -->
       <div id="v-apply">
         <div class="section">
           <h2>📊 预算总览（单位：万美元）</h2>
@@ -135,7 +134,6 @@
         </div>
       </div>
 
-      <!-- 预算设置页面 -->
       <div id="v-budget" class="hidden">
         <div class="section">
           <h2>💰 预算设置（单位：万美元）</h2>
@@ -202,12 +200,17 @@
     </div>
   </div>
 
+<div id="resetPanel" style="position:fixed;bottom:20px;right:20px;background:#fff;border:1px solid #ddd;border-radius:8px;padding:15px;box-shadow:0 2px 10px rgba(0,0,0,.1);z-index:9999">
+  <h4 style="margin:0 0 10px;font-size:14px">🔧 系统修复</h4>
+  <button onclick="resetDatabase()" style="padding:8px 15px;background:#dc2626;color:#fff;border:none;border-radius:4px;cursor:pointer">重置数据库并重建</button>
+  <p id="resetResult" style="margin:10px 0 0;font-size:12px;color:#666"></p>
+</div>
+
 <script>
 const API = '/api';
 let token = localStorage.getItem('token');
 let user = null;
 
-// 基础配置
 const DEPARTMENTS = [
   { id: 'zonghe', name: '综合部' },
   { id: 'shangwu', name: '商务部' },
@@ -256,39 +259,52 @@ if (token) enterMain();
 
 document.getElementById('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const res = await fetch(API+'/login', {
-    method:'POST', 
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      username:document.getElementById('username').value,
-      password:document.getElementById('password').value
-    })
-  });
-  const d = await res.json();
-  if (!res.ok) return alert(d.msg || '登录失败');
-  token = d.token; localStorage.setItem('token',token);
-  try { user = JSON.parse(atob(token.split('.')[1])); } catch {}
-  enterMain();
+  try {
+    const res = await fetch(API+'/login', {
+      method:'POST', 
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        username: document.getElementById('username').value.trim(),
+        password: document.getElementById('password').value
+      })
+    });
+    
+    const d = await res.json();
+    
+    if (!res.ok) {
+      alert(d.msg || '登录失败');
+      return;
+    }
+    
+    token = d.token; 
+    localStorage.setItem('token', token);
+    try { 
+      user = JSON.parse(atob(token.split('.')[1])); 
+    } catch {
+      user = { username: d.name, name: d.name, role: 'user' };
+    }
+    
+    document.getElementById('loginPage').classList.add('hidden');
+    document.getElementById('mainPage').classList.remove('hidden');
+    
+    document.getElementById('userInfo').textContent = user?.name || user?.username || '用户';
+    
+    const deptSelHTML = DEPARTMENTS.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+    document.getElementById('deptSel').innerHTML = deptSelHTML;
+    document.getElementById('bd').innerHTML = deptSelHTML;
+    
+    updateCatOptions();
+    updateBudgetCatOptions();
+    
+    await loadAll();
+    
+  } catch (err) {
+    alert('网络错误，请刷新页面试试');
+    console.error(err);
+  }
 });
 
 function logout() { localStorage.clear(); location.reload(); }
-
-async function enterMain() {
-  document.getElementById('loginPage').classList.add('hidden');
-  document.getElementById('mainPage').classList.remove('hidden');
-  document.getElementById('userInfo').textContent = user?.name || user?.username || '用户';
-  
-  // 填充部门下拉
-  const deptSelHTML = DEPARTMENTS.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-  document.getElementById('deptSel').innerHTML = deptSelHTML;
-  document.getElementById('bd').innerHTML = deptSelHTML;
-  
-  // 触发科目加载
-  updateCatOptions();
-  updateBudgetCatOptions();
-  
-  await loadAll();
-}
 
 function updateCatOptions() {
   const deptId = document.getElementById('deptSel').value;
@@ -323,20 +339,15 @@ async function loadAll() {
       fetch(API+'/requests', {headers:{Authorization:'Bearer '+token}}).then(r=>r.json())
     ]);
 
-    // 如果是空库，显示提示
     if (budgets.length === 0) {
       document.getElementById('initTip').textContent = '💡 首次使用：保存任意一条预算后，系统会自动导入全部预设数据';
     } else {
       document.getElementById('initTip').textContent = '';
     }
 
-    // 预算总览
     renderDashboard(budgets);
-    
-    // 预算一览
     renderBudgetTable(budgets);
 
-    // 申请记录
     document.getElementById('records').innerHTML = reqs.length ? reqs.map(r => {
       const amountWan = (+r.amount / 10000).toFixed(2);
       const catName = getCatName(r.category);
@@ -392,14 +403,12 @@ function renderDashboard(budgets) {
 }
 
 function renderBudgetTable(budgets) {
-  // 管理费用表
   const adminIds = CATEGORIES_ADMIN.map(c => c.id);
   const adminBudgets = budgets.filter(b => adminIds.includes(b.category));
   document.getElementById('budgetAdminTable').innerHTML = adminBudgets.length 
     ? adminBudgets.map(b => renderBudgetRow(b)).join('')
     : '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:15px">暂未设置</td></tr>';
   
-  // 销售费用表
   const salesIds = CATEGORIES_SALES.map(c => c.id);
   const salesBudgets = budgets.filter(b => salesIds.includes(b.category));
   document.getElementById('budgetSalesTable').innerHTML = salesBudgets.length 
@@ -431,7 +440,6 @@ function renderBudgetRow(b) {
     </tr>`;
 }
 
-// 标签切换
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -443,7 +451,6 @@ document.querySelectorAll('.tab').forEach(tab => {
   });
 });
 
-// 提交申请
 document.getElementById('applyForm').addEventListener('submit', async e => {
   e.preventDefault();
   const amountWan = +document.getElementById('amount').value;
@@ -472,7 +479,6 @@ document.getElementById('applyForm').addEventListener('submit', async e => {
   e.target.reset();
 });
 
-// 保存预算
 document.getElementById('budgetForm').addEventListener('submit', async e => {
   e.preventDefault();
   if (user?.role !== 'admin') return alert('仅管理员可操作');
@@ -489,14 +495,13 @@ document.getElementById('budgetForm').addEventListener('submit', async e => {
       total_amount: totalYuan,
       warning_rate: +document.getElementById('bw').value
     })
-  );
+  });
   
   const d = await res.json();
-  alert(d.ok ? '保存成功！刷新后全部预设数据将自动显示' : '保存失败');
+  alert(d.ok ? '保存成功！' : '保存失败');
   loadAll();
 });
 
-// 修改密码
 async function openChangePwd() {
   const oldPwd = prompt('请输入原密码：');
   if (!oldPwd) return;
@@ -515,22 +520,13 @@ async function openChangePwd() {
   if (d.success) logout();
 }
 
-// 导出Excel
 function exportExcel() {
   const a = document.createElement('a');
   a.href = API + '/export/excel';
   a.download = '预算申请记录_' + new Date().toLocaleDateString() + '.csv';
   a.click();
 }
-</script>
-  <!-- 管理员重置面板 -->
-<div id="resetPanel" style="position:fixed;bottom:20px;right:20px;background:#fff;border:1px solid #ddd;border-radius:8px;padding:15px;box-shadow:0 2px 10px rgba(0,0,0,.1);z-index:9999">
-  <h4 style="margin:0 0 10px;font-size:14px">🔧 系统修复</h4>
-  <button onclick="resetDatabase()" style="padding:8px 15px;background:#dc2626;color:#fff;border:none;border-radius:4px;cursor:pointer">重置数据库并重建</button>
-  <p id="resetResult" style="margin:10px 0 0;font-size:12px;color:#666"></p>
-</div>
 
-<script>
 async function resetDatabase() {
   if (!confirm('确定要重置吗？会清除旧数据重新生成初始内容！')) return;
   const res = await fetch('/api/admin/reset-db', {

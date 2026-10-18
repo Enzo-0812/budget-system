@@ -84,11 +84,11 @@
       <!-- 预算申请页面 -->
       <div id="v-apply">
         <div class="section">
-          <h2>📊 预算总览</h2>
+          <h2>📊 预算总览（单位：万美元）</h2>
           <div id="dashboard" class="dash-grid"></div>
         </div>
         <div class="section">
-          <h2>✍️ 提交申请</h2>
+          <h2>✍️ 提交申请（单位：万美元）</h2>
           <form id="applyForm">
             <div class="row">
               <div class="form-item">
@@ -102,8 +102,8 @@
             </div>
             <div class="row">
               <div class="form-item">
-                <label>申请金额(元)</label>
-                <input type="number" id="amount" step="0.01" min="0.01" required />
+                <label>申请金额（万美元）</label>
+                <input type="number" id="amount" step="0.01" min="0.01" required placeholder="例如：1.23" />
               </div>
             </div>
             <div class="form-item row-full">
@@ -115,14 +115,14 @@
           </form>
         </div>
         <div class="section">
-          <h2>📋 申请记录</h2>
+          <h2>📋 申请记录（单位：万美元）</h2>
           <table>
             <thead>
               <tr>
                 <th>申请单号</th>
                 <th>部门</th>
                 <th>科目</th>
-                <th>金额(元)</th>
+                <th>金额(万美元)</th>
                 <th>状态</th>
                 <th>时间</th>
               </tr>
@@ -197,7 +197,7 @@
       <!-- 预算设置页面 -->
       <div id="v-budget" class="hidden">
         <div class="section">
-          <h2>💰 预算设置</h2>
+          <h2>💰 预算设置（单位：万美元）</h2>
           <form id="budgetForm" class="row">
             <div class="form-item">
               <label>选择部门</label>
@@ -208,8 +208,8 @@
               <select id="bc" required></select>
             </div>
             <div class="form-item">
-              <label>预算总额(元)</label>
-              <input type="number" id="bt" step="0.01" min="0" required />
+              <label>预算总额（万美元）</label>
+              <input type="number" id="bt" step="0.01" min="0" required placeholder="例如：100" />
             </div>
             <div class="form-item">
               <label>预警线(%)</label>
@@ -279,7 +279,7 @@ async function loadAll() {
     document.getElementById('bd').innerHTML = deptSelHTML;
     document.getElementById('bc').innerHTML = catSelHTML;
 
-    // 预算总览
+    // 预算总览 —— 显示万美元
     const group = {};
     budgets.forEach(b => {
       if (!group[b.dept_id]) group[b.dept_id] = {total:0, used:0};
@@ -292,11 +292,13 @@ async function loadAll() {
     for (const [id, v] of Object.entries(group)) {
       const pct = v.total > 0 ? (v.used / v.total * 100) : 0;
       const pctFixed = pct.toFixed(1);
+      const usedWan = (v.used / 10000).toFixed(2);
+      const totalWan = (v.total / 10000).toFixed(2);
       const cls = pct >= 90 ? 'bar-red' : pct >= 80 ? 'bar-yellow' : 'bar-green';
       dash.innerHTML += `
         <div class="dash-card">
           <h3 style="font-size:15px;color:#475569;margin-bottom:8px">${deptMap[id] || id}</h3>
-          <p style="font-size:20px;font-weight:bold">¥${v.used.toLocaleString()} / ${v.total.toLocaleString()}</p>
+          <p style="font-size:20px;font-weight:bold">$${usedWan} / ${totalWan} 万</p>
           <p style="font-size:13px;color:#64748b;margin:4px 0 8px">使用率 ${pctFixed}%</p>
           <div class="bar"><div class="bar-fill ${cls}" style="width:${Math.min(pct,100)}%"></div></div>
         </div>`;
@@ -324,16 +326,19 @@ async function loadAll() {
         </td>
       </tr>`).join('') : '<tr><td colspan="3" style="text-align:center;color:#94a3b8;padding:15px">暂无科目，请新增</td></tr>';
 
-    // 申请记录
-    document.getElementById('records').innerHTML = reqs.length ? reqs.map(r => `
+    // 申请记录 —— 显示万美元
+    document.getElementById('records').innerHTML = reqs.length ? reqs.map(r => {
+      const amountWan = (+r.amount / 10000).toFixed(2);
+      return `
       <tr>
         <td>${r.request_no}</td>
         <td>${deptMap[r.dept_id] || r.dept_id}</td>
         <td>${catMap[r.category] || r.category}</td>
-        <td>¥${(+r.amount).toFixed(2)}</td>
+        <td>$${amountWan} 万</td>
         <td><span style="color:#16a34a">已通过</span></td>
         <td>${(r.created_at || '').slice(0, 16)}</td>
-      </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:15px">暂无记录</td></tr>';
+      </tr>`;
+    }).join('') : '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:15px">暂无记录</td></tr>';
 
   } catch (err) {
     console.error('加载数据失败：', err);
@@ -352,25 +357,31 @@ document.querySelectorAll('.tab').forEach(tab => {
   });
 });
 
-// 提交申请
+// 提交申请 —— 前端把万美元 → 元传给后端
 document.getElementById('applyForm').addEventListener('submit', async e => {
   e.preventDefault();
+  const amountWan = +document.getElementById('amount').value;
+  const amountYuan = Math.round(amountWan * 10000); // 转成元存储
+  
   const res = await fetch(API+'/requests', {
     method:'POST',
     headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token},
     body:JSON.stringify({
       dept: document.getElementById('deptSel').value,
       category: document.getElementById('catSel').value,
-      amount: +document.getElementById('amount').value,
+      amount: amountYuan,
       purpose: document.getElementById('purpose').value
     })
   });
   const d = await res.json();
   const box = document.getElementById('applyMsg');
   box.className = 'msg ' + (d.ok ? 'success' : 'error');
+  
+  const remainWan = ((d.remain || 0) / 10000).toFixed(2);
   box.textContent = d.ok 
-    ? `✅ 通过！申请单号：${d.no}，剩余额度：¥${(d.remain || 0).toFixed(2)}${d.warn ? '\n⚠️ ' + d.warn : ''}`
+    ? `✅ 通过！申请单号：${d.no}，剩余额度：$${remainWan} 万${d.warn ? '\n⚠️ ' + d.warn : ''}`
     : `❌ ${d.msg || '提交失败'}`;
+  
   loadAll();
   e.target.reset();
 });
@@ -415,10 +426,13 @@ document.getElementById('catForm').addEventListener('submit', async e => {
   loadAll();
 });
 
-// 保存预算
+// 保存预算 —— 前端把万美元 → 元
 document.getElementById('budgetForm').addEventListener('submit', async e => {
   e.preventDefault();
   if (user?.role !== 'admin') return alert('仅管理员可操作');
+  
+  const totalWan = +document.getElementById('bt').value;
+  const totalYuan = Math.round(totalWan * 10000); // 转成元存储
   
   await fetch(API+'/budgets', {
     method:'POST',
@@ -426,7 +440,7 @@ document.getElementById('budgetForm').addEventListener('submit', async e => {
     body:JSON.stringify({
       dept_id: document.getElementById('bd').value,
       category_id: document.getElementById('bc').value,
-      total_amount: +document.getElementById('bt').value,
+      total_amount: totalYuan,
       warning_rate: +document.getElementById('bw').value
     })
   });
@@ -437,7 +451,7 @@ document.getElementById('budgetForm').addEventListener('submit', async e => {
 
 // 删除部门
 window.delDept = async id => {
-  if (!confirm(`确定要删除部门「${deptMap[id] || id}」吗？此操作不可恢复！`)) return;
+  if (!confirm(`确定要删除该部门吗？此操作不可恢复！`)) return;
   await fetch(`${API}/depts/${id}`, {
     method:'DELETE',
     headers:{'Authorization':'Bearer '+token}
@@ -447,7 +461,7 @@ window.delDept = async id => {
 
 // 删除科目
 window.delCat = async id => {
-  if (!confirm(`确定要删除科目「${catMap[id] || id}」吗？此操作不可恢复！`)) return;
+  if (!confirm(`确定要删除该科目吗？此操作不可恢复！`)) return;
   await fetch(`${API}/categories/${id}`, {
     method:'DELETE',
     headers:{'Authorization':'Bearer '+token}
@@ -474,7 +488,7 @@ async function openChangePwd() {
   if (d.success) logout();
 }
 
-// 导出Excel
+// 导出Excel —— 金额显示万美元
 function exportExcel() {
   const a = document.createElement('a');
   a.href = API + '/export/excel';

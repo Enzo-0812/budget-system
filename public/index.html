@@ -39,8 +39,8 @@
     .bar-green{background:#16a34a}
     .bar-yellow{background:#f59e0b}
     .bar-red{background:#dc2626}
-    .tabs{display:flex;gap:10px;margin-bottom:20px}
-    .tab{padding:8px 16px;background:#f1f5f9;border-radius:6px;cursor:pointer;border:none}
+    .tabs{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+    .tab{padding:10px 18px;background:#f1f5f9;border-radius:6px;cursor:pointer;border:none;font-size:14px}
     .tab.active{background:#2563eb;color:#fff}
   </style>
 </head>
@@ -81,6 +81,7 @@
         <button class="tab" data-view="budget">预算设置</button>
       </div>
 
+      <!-- 预算申请页面 -->
       <div id="v-apply">
         <div class="section">
           <h2>📊 预算总览</h2>
@@ -109,49 +110,114 @@
               <label>用途说明</label>
               <textarea id="purpose" rows="3" required></textarea>
             </div>
-            <button type="submit" class="btn">提交申请</button>
+            <button type="submit" class="btn" style="width:auto">提交申请</button>
             <div id="applyMsg" class="msg"></div>
           </form>
         </div>
         <div class="section">
           <h2>📋 申请记录</h2>
-          <table><thead><tr><th>申请单号</th><th>部门</th><th>科目</th><th>金额</th><th>状态</th><th>时间</th></tr></thead><tbody id="records"></tbody></table>
+          <table>
+            <thead>
+              <tr>
+                <th>申请单号</th>
+                <th>部门</th>
+                <th>科目</th>
+                <th>金额(元)</th>
+                <th>状态</th>
+                <th>时间</th>
+              </tr>
+            </thead>
+            <tbody id="records"></tbody>
+          </table>
         </div>
       </div>
 
+      <!-- 部门管理页面 -->
       <div id="v-dept" class="hidden">
         <div class="section">
           <h2>🏢 部门管理</h2>
           <form id="deptForm" class="row">
-            <div class="form-item"><label>部门ID</label><input type="text" id="deptId" required /></div>
-            <div class="form-item"><label>部门名称</label><input type="text" id="deptName" required /></div>
-            <div class="row-full"><button type="submit" class="btn" style="width:auto">保存部门</button></div>
+            <div class="form-item">
+              <label>部门标识（英文/拼音，如 zonghe）</label>
+              <input type="text" id="deptId" placeholder="例如 zonghe" required />
+            </div>
+            <div class="form-item">
+              <label>部门显示名称</label>
+              <input type="text" id="deptName" placeholder="例如 综合管理部" required />
+            </div>
+            <div class="row-full">
+              <button type="submit" class="btn" style="width:auto">保存部门</button>
+              <p style="font-size:12px;color:#64748b;margin-top:8px;">提示：标识已存在 = 修改名称；不存在 = 新增</p>
+            </div>
           </form>
-          <table><thead><tr><th>ID</th><th>名称</th><th>操作</th></tr></thead><tbody id="deptList"></tbody></table>
+          <table>
+            <thead>
+              <tr>
+                <th>部门标识</th>
+                <th>显示名称</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="deptList"></tbody>
+          </table>
         </div>
       </div>
 
+      <!-- 科目管理页面 -->
       <div id="v-cat" class="hidden">
         <div class="section">
           <h2>📑 科目管理</h2>
           <form id="catForm" class="row">
-            <div class="form-item"><label>科目ID</label><input type="text" id="catId" required /></div>
-            <div class="form-item"><label>科目名称</label><input type="text" id="catName" required /></div>
-            <div class="row-full"><button type="submit" class="btn" style="width:auto">保存科目</button></div>
+            <div class="form-item">
+              <label>科目标识（英文/拼音，如 office）</label>
+              <input type="text" id="catId" placeholder="例如 office" required />
+            </div>
+            <div class="form-item">
+              <label>科目显示名称</label>
+              <input type="text" id="catName" placeholder="例如 日常办公费" required />
+            </div>
+            <div class="row-full">
+              <button type="submit" class="btn" style="width:auto">保存科目</button>
+              <p style="font-size:12px;color:#64748b;margin-top:8px;">提示：标识已存在 = 修改名称；不存在 = 新增</p>
+            </div>
           </form>
-          <table><thead><tr><th>ID</th><th>名称</th><th>操作</th></tr></thead><tbody id="catList"></tbody></table>
+          <table>
+            <thead>
+              <tr>
+                <th>科目标识</th>
+                <th>显示名称</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="catList"></tbody>
+          </table>
         </div>
       </div>
 
+      <!-- 预算设置页面 -->
       <div id="v-budget" class="hidden">
         <div class="section">
           <h2>💰 预算设置</h2>
           <form id="budgetForm" class="row">
-            <div class="form-item"><label>部门</label><select id="bd" required></select></div>
-            <div class="form-item"><label>科目</label><select id="bc" required></select></div>
-            <div class="form-item"><label>总额(元)</label><input type="number" id="bt" step="0.01" required /></div>
-            <div class="form-item"><label>预警线(%)</label><input type="number" id="bw" value="80" required /></div>
-            <div class="row-full"><button type="submit" class="btn" style="width:auto">保存预算</button></div>
+            <div class="form-item">
+              <label>选择部门</label>
+              <select id="bd" required></select>
+            </div>
+            <div class="form-item">
+              <label>选择科目</label>
+              <select id="bc" required></select>
+            </div>
+            <div class="form-item">
+              <label>预算总额(元)</label>
+              <input type="number" id="bt" step="0.01" min="0" required />
+            </div>
+            <div class="form-item">
+              <label>预警线(%)</label>
+              <input type="number" id="bw" value="80" min="1" max="100" required />
+            </div>
+            <div class="row-full">
+              <button type="submit" class="btn" style="width:auto">保存预算</button>
+            </div>
           </form>
         </div>
       </div>
@@ -169,16 +235,17 @@ if (token) enterMain();
 document.getElementById('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
   const res = await fetch(API+'/login', {
-    method:'POST', headers:{'Content-Type':'application/json'},
+    method:'POST', 
+    headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
       username:document.getElementById('username').value,
       password:document.getElementById('password').value
     })
   });
   const d = await res.json();
-  if (!res.ok) return alert(d.msg);
+  if (!res.ok) return alert(d.msg || '登录失败');
   token = d.token; localStorage.setItem('token',token);
-  try { user = JSON.parse(atob(token.split('.')[1])); }catch{}
+  try { user = JSON.parse(atob(token.split('.')[1])); } catch {}
   enterMain();
 });
 
@@ -192,116 +259,228 @@ async function enterMain() {
 }
 
 async function loadAll() {
-  const [depts,cats,budgets,reqs] = await Promise.all([
-    fetch(API+'/depts',{headers:{Authorization:'Bearer '+token}}).then(r=>r.json()),
-    fetch(API+'/categories',{headers:{Authorization:'Bearer '+token}}).then(r=>r.json()),
-    fetch(API+'/budgets',{headers:{Authorization:'Bearer '+token}}).then(r=>r.json()),
-    fetch(API+'/requests',{headers:{Authorization:'Bearer '+token}}).then(r=>r.json())
-  ]);
-  depts.forEach(d=>deptMap[d.dept_id]=d.display_name);
-  cats.forEach(c=>catMap[c.cat_id]=c.display_name);
+  try {
+    const [depts, cats, budgets, reqs] = await Promise.all([
+      fetch(API+'/depts', {headers:{Authorization:'Bearer '+token}}).then(r=>r.json()),
+      fetch(API+'/categories', {headers:{Authorization:'Bearer '+token}}).then(r=>r.json()),
+      fetch(API+'/budgets', {headers:{Authorization:'Bearer '+token}}).then(r=>r.json()),
+      fetch(API+'/requests', {headers:{Authorization:'Bearer '+token}}).then(r=>r.json())
+    ]);
 
-  const ds = document.getElementById('deptSel'); ds.innerHTML=''; depts.forEach(d=>ds.innerHTML+=`<option value="${d.dept_id}">${d.display_name}</option>`);
-  const cs = document.getElementById('catSel'); cs.innerHTML=''; cats.forEach(c=>cs.innerHTML+=`<option value="${c.cat_id}">${c.display_name}</option>`);
-  document.getElementById('bd').innerHTML=ds.innerHTML;
-  document.getElementById('bc').innerHTML=cs.innerHTML;
+    depts.forEach(d => deptMap[d.dept_id] = d.display_name);
+    cats.forEach(c => catMap[c.cat_id] = c.display_name);
 
-  const dash = document.getElementById('dashboard'); dash.innerHTML='';
-  const group = {};
-  budgets.forEach(b=>{
-    if(!group[b.dept_id]) group[b.dept_id]={total:0,used:0};
-    group[b.dept_id].total += +b.total_amount;
-    group[b.dept_id].used += +b.used_amount;
-  });
-  for(const [id,v] of Object.entries(group)){
-    const pct = v.used/v.total*100||0;
-    const cls = pct>=90?'bar-red':pct>=80?'bar-yellow':'bar-green';
-    dash.innerHTML += `<div class="dash-card"><h3>${deptMap[id]||id}</h3><p style="font-size:20px;font-weight:bold;margin:6px 0">¥${v.used.toLocaleString()} / ${v.total.toLocaleString()}</p><p style="font-size:12px;color:#64748b">使用率${pct.toFixed(1)}%</p><div class="bar"><div class="bar-fill ${cls}" style="width:${pct}%"></div></div></div>`;
+    // 填充下拉选项
+    const deptSelHTML = depts.map(d => `<option value="${d.dept_id}">${d.display_name}</option>`).join('');
+    const catSelHTML = cats.map(c => `<option value="${c.cat_id}">${c.display_name}</option>`).join('');
+    
+    document.getElementById('deptSel').innerHTML = deptSelHTML;
+    document.getElementById('catSel').innerHTML = catSelHTML;
+    document.getElementById('bd').innerHTML = deptSelHTML;
+    document.getElementById('bc').innerHTML = catSelHTML;
+
+    // 预算总览
+    const group = {};
+    budgets.forEach(b => {
+      if (!group[b.dept_id]) group[b.dept_id] = {total:0, used:0};
+      group[b.dept_id].total += +b.total_amount;
+      group[b.dept_id].used += +b.used_amount;
+    });
+    
+    const dash = document.getElementById('dashboard');
+    dash.innerHTML = '';
+    for (const [id, v] of Object.entries(group)) {
+      const pct = v.total > 0 ? (v.used / v.total * 100) : 0;
+      const pctFixed = pct.toFixed(1);
+      const cls = pct >= 90 ? 'bar-red' : pct >= 80 ? 'bar-yellow' : 'bar-green';
+      dash.innerHTML += `
+        <div class="dash-card">
+          <h3 style="font-size:15px;color:#475569;margin-bottom:8px">${deptMap[id] || id}</h3>
+          <p style="font-size:20px;font-weight:bold">¥${v.used.toLocaleString()} / ${v.total.toLocaleString()}</p>
+          <p style="font-size:13px;color:#64748b;margin:4px 0 8px">使用率 ${pctFixed}%</p>
+          <div class="bar"><div class="bar-fill ${cls}" style="width:${Math.min(pct,100)}%"></div></div>
+        </div>`;
+    }
+
+    // 部门列表
+    document.getElementById('deptList').innerHTML = depts.length ? depts.map(d => `
+      <tr>
+        <td>${d.dept_id}</td>
+        <td>${d.display_name}</td>
+        <td>${user?.role === 'admin' 
+          ? `<button class="btn-sm btn-danger" onclick="delDept('${d.dept_id}')">删除</button>` 
+          : '<span style="color:#94a3b8">仅管理员可操作</span>'}
+        </td>
+      </tr>`).join('') : '<tr><td colspan="3" style="text-align:center;color:#94a3b8;padding:15px">暂无部门，请新增</td></tr>';
+
+    // 科目列表
+    document.getElementById('catList').innerHTML = cats.length ? cats.map(c => `
+      <tr>
+        <td>${c.cat_id}</td>
+        <td>${c.display_name}</td>
+        <td>${user?.role === 'admin' 
+          ? `<button class="btn-sm btn-danger" onclick="delCat('${c.cat_id}')">删除</button>` 
+          : '<span style="color:#94a3b8">仅管理员可操作</span>'}
+        </td>
+      </tr>`).join('') : '<tr><td colspan="3" style="text-align:center;color:#94a3b8;padding:15px">暂无科目，请新增</td></tr>';
+
+    // 申请记录
+    document.getElementById('records').innerHTML = reqs.length ? reqs.map(r => `
+      <tr>
+        <td>${r.request_no}</td>
+        <td>${deptMap[r.dept_id] || r.dept_id}</td>
+        <td>${catMap[r.category] || r.category}</td>
+        <td>¥${(+r.amount).toFixed(2)}</td>
+        <td><span style="color:#16a34a">已通过</span></td>
+        <td>${(r.created_at || '').slice(0, 16)}</td>
+      </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:15px">暂无记录</td></tr>';
+
+  } catch (err) {
+    console.error('加载数据失败：', err);
   }
-
-  document.getElementById('deptList').innerHTML = depts.map(d=>`<tr><td>${d.dept_id}</td><td>${d.display_name}</td><td>${user?.role==='admin'?`<button class="btn-sm btn-danger" onclick="delDept('${d.dept_id}')">删除</button>`:'无权限'}</td></tr>`).join('');
-  document.getElementById('catList').innerHTML = cats.map(c=>`<tr><td>${c.cat_id}</td><td>${c.display_name}</td><td>${user?.role==='admin'?`<button class="btn-sm btn-danger" onclick="delCat('${c.cat_id}')">删除</button>`:'无权限'}</td></tr>`).join('');
-  document.getElementById('records').innerHTML = reqs.length?reqs.map(r=>`<tr><td>${r.request_no}</td><td>${deptMap[r.dept_id]||r.dept_id}</td><td>${catMap[r.category]||r.category}</td><td>¥${(+r.amount).toFixed(2)}</td><td><span style="color:#16a34a">已通过</span></td><td>${(r.created_at||'').slice(0,16)}</td></tr>`).join(''):'<tr><td colspan="6" style="text-align:center;color:#94a3b8">暂无记录</td></tr>';
 }
 
-document.getElementById('applyForm').addEventListener('submit',async e=>{
+// 标签切换
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const view = tab.dataset.view;
+    ['apply', 'dept', 'cat', 'budget'].forEach(v => {
+      document.getElementById('v-' + v).classList.toggle('hidden', v !== view);
+    });
+  });
+});
+
+// 提交申请
+document.getElementById('applyForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const res = await fetch(API+'/requests',{
-    method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+  const res = await fetch(API+'/requests', {
+    method:'POST',
+    headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token},
     body:JSON.stringify({
-      dept:document.getElementById('deptSel').value,
-      category:document.getElementById('catSel').value,
-      amount:+document.getElementById('amount').value,
-      purpose:document.getElementById('purpose').value
+      dept: document.getElementById('deptSel').value,
+      category: document.getElementById('catSel').value,
+      amount: +document.getElementById('amount').value,
+      purpose: document.getElementById('purpose').value
     })
   });
   const d = await res.json();
   const box = document.getElementById('applyMsg');
-  box.className = 'msg '+(d.ok?'success':'error');
-  box.textContent = d.ok?`✅ 通过！单号${d.no}，剩余¥${d.remain.toFixed(2)}${d.warn?'\n'+d.warn:''}`:`❌ ${d.msg}`;
-  loadAll(); e.target.reset();
+  box.className = 'msg ' + (d.ok ? 'success' : 'error');
+  box.textContent = d.ok 
+    ? `✅ 通过！申请单号：${d.no}，剩余额度：¥${(d.remain || 0).toFixed(2)}${d.warn ? '\n⚠️ ' + d.warn : ''}`
+    : `❌ ${d.msg || '提交失败'}`;
+  loadAll();
+  e.target.reset();
 });
 
-document.getElementById('deptForm').addEventListener('submit',async e=>{
+// 保存部门
+document.getElementById('deptForm').addEventListener('submit', async e => {
   e.preventDefault();
-  await fetch(API+'/depts',{
-    method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-    body:JSON.stringify({dept_id:document.getElementById('deptId').value,display_name:document.getElementById('deptName').value})
+  if (user?.role !== 'admin') return alert('仅管理员可操作');
+  const deptId = document.getElementById('deptId').value.trim();
+  const deptName = document.getElementById('deptName').value.trim();
+  if (!deptId || !deptName) return alert('请填写完整');
+  
+  await fetch(API+'/depts', {
+    method:'POST',
+    headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token},
+    body:JSON.stringify({dept_id: deptId, display_name: deptName})
   });
-  document.getElementById('deptId').value='';document.getElementById('deptName').value='';
+  
+  document.getElementById('deptId').value = '';
+  document.getElementById('deptName').value = '';
+  alert('保存成功！');
   loadAll();
 });
-document.getElementById('catForm').addEventListener('submit',async e=>{
+
+// 保存科目
+document.getElementById('catForm').addEventListener('submit', async e => {
   e.preventDefault();
-  await fetch(API+'/categories',{
-    method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-    body:JSON.stringify({cat_id:document.getElementById('catId').value,display_name:document.getElementById('catName').value})
+  if (user?.role !== 'admin') return alert('仅管理员可操作');
+  const catId = document.getElementById('catId').value.trim();
+  const catName = document.getElementById('catName').value.trim();
+  if (!catId || !catName) return alert('请填写完整');
+  
+  await fetch(API+'/categories', {
+    method:'POST',
+    headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token},
+    body:JSON.stringify({cat_id: catId, display_name: catName})
   });
-  document.getElementById('catId').value='';document.getElementById('catName').value='';
+  
+  document.getElementById('catId').value = '';
+  document.getElementById('catName').value = '';
+  alert('保存成功！');
   loadAll();
 });
-document.getElementById('budgetForm').addEventListener('submit',async e=>{
+
+// 保存预算
+document.getElementById('budgetForm').addEventListener('submit', async e => {
   e.preventDefault();
-  await fetch(API+'/budgets',{
-    method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+  if (user?.role !== 'admin') return alert('仅管理员可操作');
+  
+  await fetch(API+'/budgets', {
+    method:'POST',
+    headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token},
     body:JSON.stringify({
-      dept_id:document.getElementById('bd').value,
-      category_id:document.getElementById('bc').value,
-      total_amount:+document.getElementById('bt').value,
-      warning_rate:+document.getElementById('bw').value
+      dept_id: document.getElementById('bd').value,
+      category_id: document.getElementById('bc').value,
+      total_amount: +document.getElementById('bt').value,
+      warning_rate: +document.getElementById('bw').value
     })
   });
-  loadAll(); alert('保存成功');
+  
+  alert('预算保存成功！');
+  loadAll();
 });
 
-window.delDept = async id => { if(!confirm('确定删除？'))return; await fetch(`${API}/depts/${id}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}}); loadAll(); };
-window.delCat = async id => { if(!confirm('确定删除？'))return; await fetch(`${API}/categories/${id}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}}); loadAll(); };
+// 删除部门
+window.delDept = async id => {
+  if (!confirm(`确定要删除部门「${deptMap[id] || id}」吗？此操作不可恢复！`)) return;
+  await fetch(`${API}/depts/${id}`, {
+    method:'DELETE',
+    headers:{'Authorization':'Bearer '+token}
+  });
+  loadAll();
+};
 
-function openChangePwd() {
-  const oldPwd = prompt('请输入原密码：'); if(!oldPwd) return;
-  const newPwd = prompt('新密码（至少6位）：'); if(!newPwd) return;
-  const confirmPwd = prompt('确认新密码：'); if(!confirmPwd) return;
-  fetch('/user/password',{
-    method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-    body:JSON.stringify({oldPwd,newPwd,confirmPwd})
-  }).then(r=>r.json()).then(d=>{alert(d.msg);if(d.success)logout();});
+// 删除科目
+window.delCat = async id => {
+  if (!confirm(`确定要删除科目「${catMap[id] || id}」吗？此操作不可恢复！`)) return;
+  await fetch(`${API}/categories/${id}`, {
+    method:'DELETE',
+    headers:{'Authorization':'Bearer '+token}
+  });
+  loadAll();
+};
+
+// 修改密码
+async function openChangePwd() {
+  const oldPwd = prompt('请输入原密码：');
+  if (!oldPwd) return;
+  const newPwd = prompt('请输入新密码（至少6位）：');
+  if (!newPwd || newPwd.length < 6) return alert('密码至少6位');
+  const confirmPwd = prompt('请再次输入新密码：');
+  if (newPwd !== confirmPwd) return alert('两次输入的新密码不一致');
+  
+  const res = await fetch('/user/password', {
+    method:'POST',
+    headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token},
+    body:JSON.stringify({oldPwd, newPwd, confirmPwd})
+  });
+  const d = await res.json();
+  alert(d.msg || d.message);
+  if (d.success) logout();
 }
 
+// 导出Excel
 function exportExcel() {
   const a = document.createElement('a');
-  a.href = API+'/export/excel';
-  a.download = '预算导出.csv';
+  a.href = API + '/export/excel';
+  a.download = '预算申请记录_' + new Date().toLocaleDateString() + '.csv';
   a.click();
 }
-
-document.querySelectorAll('.tab').forEach(t=>{
-  t.addEventListener('click',()=>{
-    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-    t.classList.add('active');
-    const v = t.dataset.view;
-    ['apply','dept','cat','budget'].forEach(k=>document.getElementById('v-'+k).classList.toggle('hidden',k!==v));
-  });
-});
 </script>
 </body>
 </html>

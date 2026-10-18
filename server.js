@@ -1,129 +1,183 @@
 const express = require('express');
 const { Pool } = require('pg');
-const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const cors = require('cors');
-require('dotenv').config();
-
-const userRouter = require('./routes/user');
+const path = require('path');
 
 const app = express();
+const PORT = process.env.PORT || 10000;
+const JWT_SECRET = process.env.JWT_SECRET || 'budget-secret-2026';
+
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
-app.use('/user', userRouter);
+app.use(express.static(path.join(__dirname, 'public')));
 
-const SECRET = process.env.JWT_SECRET || 'budget-secret-2026';
-
+// 数据库连接
 const db = new Pool({
   connectionString: process.env.DATABASE_URL
 });
 
-async function initDB() {
-  await db.query(`
-CREATE TABLE IF NOT EXISTS users (
-  id SERIAL PRIMARY KEY,
-  username VARCHAR(50) UNIQUE NOT NULL,
-  password VARCHAR(255) NOT NULL,
-  real_name VARCHAR(50) NOT NULL,
-  dept_id VARCHAR(20) NOT NULL,
-  role VARCHAR(20) NOT NULL DEFAULT 'staff',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS budgets (
-  id SERIAL PRIMARY KEY,
-  dept_id VARCHAR(20) NOT NULL,
-  category VARCHAR(50) NOT NULL,
-  total_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
-  used_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
-  UNIQUE (dept_id, category)
-);
-
-CREATE TABLE IF NOT EXISTS requests (
-  id SERIAL PRIMARY KEY,
-  request_no VARCHAR(32) UNIQUE NOT NULL,
-  applicant_id INT NOT NULL REFERENCES users(id),
-  dept_id VARCHAR(20) NOT NULL,
-  category VARCHAR(50) NOT NULL,
-  amount NUMERIC(12,2) NOT NULL,
-  purpose TEXT NOT NULL,
-  status VARCHAR(20) DEFAULT 'approved',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-  `);
-
-  const admin = await db.query('SELECT id FROM users WHERE username=$1', ['admin']);
-  if (!admin.rows.length) {
-    const hash = await bcrypt.hash('123456', 10);
-    await db.query(
-      'INSERT INTO users (username,password,real_name,dept_id,role) VALUES ($1,$2,$3,$4,$5)',
-      ['admin', hash, '系统管理员', 'admin', 'admin']
-    );
-    const depts = ['admin','sales','tech','ops'];
-    const cats = [['office',50000],['travel',30000],['procurement',60000],['business',15000],['project',40000]];
-    for (const d of depts) {
-      for (const [c,t] of cats) {
-        await db.query(
-          'INSERT INTO budgets (dept_id,category,total_amount,used_amount) VALUES ($1,$2,$3,$4)',
-          [d, c, t, Math.floor(Math.random() * t * 0.7)]
-        );
-      }
-    }
+// JWT 认证中间件
+function auth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ msg: '未登录' });
+  const token = authHeader.replace('Bearer ', '');
+  try {
+    const user = jwt.verify(token, JWT_SECRET);
+    req.user = user;
+    next();
+  } catch {
+    return res.status(401).json({ msg: '登录已过期' });
   }
 }
 
-app.post('/api/login', async (req, res) => {
-  const {username, password} = req.body;
-  const {rows} = await db.query('SELECT * FROM users WHERE username=$1', [username]);
-  if (!rows.length) return res.status(400).json({msg:'账号或密码错误'});
-  const ok = await bcrypt.compare(password, rows[0].password);
-  if (!ok) return res.status(400).json({msg:'账号或密码错误'});
-  const token = jwt.sign({id:rows[0].id, role:rows[0].role}, SECRET, {expiresIn:'24h'});
-  res.json({token, user:{name:rows[0].real_name, role:rows[0].role}});
-});
-
-function auth(req, res, next) {
-  const h = req.headers.authorization;
-  if (!h) return res.status(401).json({msg:'未登录'});
+// 初始化数据库表
+async function initDatabase() {
   try {
-    req.user = jwt.verify(h.split(' ')[1], SECRET);
-    next();
-  } catch { res.status(401).json({msg:'登录已过期'}); }
+    // 用户表
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(50) UNIQUE NOT NULL,
+        name VARCHAR(50),
+        password VARCHAR(255) NOT NULL,
+        department VARCHAR(50),
+        role VARCHAR(20) DEFAULT 'user',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 部门配置表
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS dept_config (
+        dept_id VARCHAR(20) PRIMARY KEY,
+        display_name VARCHAR(50) NOT NULL
+      )
+    `);
+
+    // 科目配置表
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS category_config (
+        cat_id VARCHAR(20) PRIMARY KEY,
+        display_name VARCHAR(50) NOT NULL
+      )
+    `);
+
+    // 预算表
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS budgets (
+        id SERIAL PRIMARY KEY,
+        dept_id VARCHAR(20) NOT NULL,
+        category_id VARCHAR(20) NOT NULL,
+        total_amount DECIMAL(15,2) DEFAULT 0,
+        used_amount DECIMAL(15,2) DEFAULT 0,
+        warning_rate DECIMAL(5,2) DEFAULT 80.00,
+        UNIQUE(dept_id, category_id)
+      )
+    `);
+
+    // 申请表
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS requests (
+        id SERIAL PRIMARY KEY,
+        request_no VARCHAR(30) UNIQUE NOT NULL,
+        dept_id VARCHAR(20) NOT NULL,
+        category VARCHAR(20) NOT NULL,
+        amount DECIMAL(15,2) NOT NULL,
+        purpose TEXT,
+        applicant_id INT REFERENCES users(id),
+        status VARCHAR(20) DEFAULT 'approved',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 初始化默认部门
+    const depts = [
+      ['admin','综合管理部'],
+      ['finance','财务部'],
+      ['director','管理层']
+    ];
+    for (const [id, name] of depts) {
+      await db.query(
+        'INSERT INTO dept_config (dept_id, display_name) VALUES ($1, $2) ON CONFLICT (dept_id) DO NOTHING',
+        [id, name]
+      );
+    }
+
+    // 初始化默认科目
+    const cats = [
+      ['office','日常办公费'],
+      ['travel','差旅交通费'],
+      ['procurement','固定资产采购'],
+      ['business','业务招待费'],
+      ['project','专项项目支出']
+    ];
+    for (const [id, name] of cats) {
+      await db.query(
+        'INSERT INTO category_config (cat_id, display_name) VALUES ($1, $2) ON CONFLICT (cat_id) DO NOTHING',
+        [id, name]
+      );
+    }
+
+    // 初始化管理员
+    const adminCheck = await db.query('SELECT * FROM users WHERE username = $1', ['admin']);
+    if (adminCheck.rows.length === 0) {
+      const hash = await bcrypt.hash('123456', 10);
+      await db.query(
+        'INSERT INTO users (username, name, password, department, role) VALUES ($1, $2, $3, $4, $5)',
+        ['admin', '系统管理员', hash, 'admin', 'admin']
+      );
+    }
+
+    console.log('✅ 数据库初始化完成');
+  } catch (err) {
+    console.error('❌ 初始化失败:', err);
+  }
 }
 
-app.get('/api/budgets', auth, async (req, res) => {
-  const {rows} = await db.query('SELECT dept_id,category,total_amount,used_amount FROM budgets');
-  res.json(rows);
-});
-
-app.post('/api/requests', auth, async (req, res) => {
-  const {dept, category, amount, purpose} = req.body;
-  const {rows} = await db.query('SELECT total_amount,used_amount FROM budgets WHERE dept_id=$1 AND category=$2', [dept, category]);
-  if (!rows.length) return res.status(400).json({msg:'预算科目不存在'});
-  const remain = Number(rows[0].total_amount) - Number(rows[0].used_amount);
-  if (amount > remain) return res.json({ok:false, msg:`预算不足！剩余¥${remain.toFixed(2)}`});
+// 登录接口
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+  const result = await db.query('SELECT * FROM users WHERE username = $1', [username]);
+  if (result.rows.length === 0) {
+    return res.status(400).json({ msg: '账号或密码错误' });
+  }
+  const user = result.rows[0];
+  const ok = await bcrypt.compare(password, user.password);
+  if (!ok) return res.status(400).json({ msg: '账号或密码错误' });
   
-  await db.query('UPDATE budgets SET used_amount=used_amount+$1 WHERE dept_id=$2 AND category=$3', [amount, dept, category]);
-  const no = `REQ${Date.now()}`;
-  await db.query(
-    'INSERT INTO requests (request_no,applicant_id,dept_id,category,amount,purpose,status) VALUES ($1,$2,$3,$4,$5,$6,$7)',
-    [no, req.user.id, dept, category, amount, purpose, 'approved']
+  const token = jwt.sign(
+    { id: user.id, username: user.username, name: user.name, role: user.role, dept: user.department },
+    JWT_SECRET,
+    { expiresIn: '7d' }
   );
-  res.json({ok:true, no, remain: remain - amount});
+  res.json({ token, name: user.name, role: user.role });
 });
 
-app.get('/api/requests', auth, async (req, res) => {
-  const {rows} = await db.query(`
-    SELECT r.*, u.real_name as applicant_name 
-    FROM requests r LEFT JOIN users u ON r.applicant_id=u.id 
-    ORDER BY r.created_at DESC LIMIT 50
-  `);
-  res.json(rows);
+// 获取部门列表
+app.get('/api/depts', auth, async (req, res) => {
+  const result = await db.query('SELECT dept_id, display_name FROM dept_config ORDER BY dept_id');
+  res.json(result.rows);
 });
 
-const PORT = process.env.PORT || 3000;
-initDB().then(() => {
-  console.log('✅ 系统已就绪');
-  app.listen(PORT, () => console.log(`🚀 服务运行中`));
-}).catch(e => console.error('❌ 启动失败:', e));
+// 新增/修改部门
+app.post('/api/depts', auth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ msg: '无权限' });
+  const { dept_id, display_name } = req.body;
+  await db.query(`
+    INSERT INTO dept_config (dept_id, display_name) VALUES ($1, $2)
+    ON CONFLICT (dept_id) DO UPDATE SET display_name = $2
+  `, [dept_id, display_name]);
+  res.json({ ok: true });
+});
+
+// 获取科目列表
+app.get('/api/categories', auth, async (req, res) => {
+  const result = await db.query('SELECT cat_id, display_name FROM category_config ORDER BY cat_id');
+  res.json(result.rows);
+});
+
+// 新增/修改科目
+app.post('/api/categories', auth, async (req, res) => {
+  if (req.user.role !== 'admin')

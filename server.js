@@ -80,33 +80,16 @@ async function initDatabase() {
       )
     `);
 
-    const depts = [
-      ['admin','综合管理部'],
-      ['finance','财务部'],
-      ['director','管理层']
-    ];
+    const depts = [['admin','综合管理部'],['finance','财务部'],['director','管理层']];
     for (const [id, name] of depts) {
-      await db.query(
-        'INSERT INTO dept_config (dept_id, display_name) VALUES ($1, $2) ON CONFLICT (dept_id) DO UPDATE SET display_name = $2',
-        [id, name]
-      );
+      await db.query(`INSERT INTO dept_config VALUES ($1,$2) ON CONFLICT (dept_id) DO UPDATE SET display_name=$2`, [id, name]);
     }
-
-    const cats = [
-      ['office','日常办公费'],
-      ['travel','差旅交通费'],
-      ['procurement','固定资产采购'],
-      ['business','业务招待费'],
-      ['project','专项项目支出']
-    ];
+    const cats = [['office','日常办公费'],['travel','差旅交通费'],['procurement','固定资产采购'],['business','业务招待费'],['project','专项项目支出']];
     for (const [id, name] of cats) {
-      await db.query(
-        'INSERT INTO category_config (cat_id, display_name) VALUES ($1, $2) ON CONFLICT (cat_id) DO UPDATE SET display_name = $2',
-        [id, name]
-      );
+      await db.query(`INSERT INTO category_config VALUES ($1,$2) ON CONFLICT (cat_id) DO UPDATE SET display_name=$2`, [id, name]);
     }
 
-    // 批量导入用户
+    // 所有用户：不存在就新增，已存在就更新密码
     const users = [
       { username: 'Enzo', name: 'Enzo', password: 'ZZY1995zxakk', department: 'admin', role: 'admin' },
       { username: 'SHI', name: 'SHI', password: '123456', department: 'finance', role: 'user' },
@@ -122,18 +105,23 @@ async function initDatabase() {
 
     for (const u of users) {
       const chk = await db.query('SELECT * FROM users WHERE username = $1', [u.username]);
+      const hash = await bcrypt.hash(u.password, 10);
       if (chk.rows.length === 0) {
-        const hash = await bcrypt.hash(u.password, 10);
         await db.query(
           'INSERT INTO users (username, name, password, department, role) VALUES ($1, $2, $3, $4, $5)',
           [u.username, u.name, hash, u.department, u.role]
         );
+      } else {
+        await db.query(
+          'UPDATE users SET password = $1, name = $2, department = $3, role = $4 WHERE username = $5',
+          [hash, u.name, u.department, u.role, u.username]
+        );
       }
     }
 
-    console.log('✅ 数据库初始化完成 + 用户导入成功');
+    console.log('✅ 数据库初始化完成');
   } catch (err) {
-    console.error('❌ 初始化失败:', err);
+    console.error('❌', err);
   }
 }
 
@@ -141,7 +129,8 @@ app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
   const u = (await db.query('SELECT * FROM users WHERE username = $1', [username])).rows[0];
   if (!u) return res.status(400).json({ msg: '账号或密码错误' });
-  if (!await bcrypt.compare(password, u.password)) return res.status(400).json({ msg: '账号或密码错误' });
+  const ok = await bcrypt.compare(password, u.password);
+  if (!ok) return res.status(400).json({ msg: '账号或密码错误' });
   const token = jwt.sign(
     { id: u.id, username: u.username, name: u.name, role: u.role, dept: u.department },
     JWT_SECRET,
@@ -154,17 +143,12 @@ app.get('/api/depts', auth, async (_, res) => {
   const r = await db.query('SELECT dept_id, display_name FROM dept_config ORDER BY dept_id');
   res.json(r.rows);
 });
-
 app.post('/api/depts', auth, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ msg: '无权限' });
   const { dept_id, display_name } = req.body;
-  await db.query(
-    'INSERT INTO dept_config VALUES ($1, $2) ON CONFLICT (dept_id) DO UPDATE SET display_name = $2',
-    [dept_id, display_name]
-  );
+  await db.query(`INSERT INTO dept_config VALUES ($1,$2) ON CONFLICT (dept_id) DO UPDATE SET display_name=$2`, [dept_id, display_name]);
   res.json({ ok: true });
 });
-
 app.delete('/api/depts/:id', auth, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ msg: '无权限' });
   await db.query('DELETE FROM dept_config WHERE dept_id = $1', [req.params.id]);
@@ -175,17 +159,12 @@ app.get('/api/categories', auth, async (_, res) => {
   const r = await db.query('SELECT cat_id, display_name FROM category_config ORDER BY cat_id');
   res.json(r.rows);
 });
-
 app.post('/api/categories', auth, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ msg: '无权限' });
   const { cat_id, display_name } = req.body;
-  await db.query(
-    'INSERT INTO category_config VALUES ($1, $2) ON CONFLICT (cat_id) DO UPDATE SET display_name = $2',
-    [cat_id, display_name]
-  );
+  await db.query(`INSERT INTO category_config VALUES ($1,$2) ON CONFLICT (cat_id) DO UPDATE SET display_name=$2`, [cat_id, display_name]);
   res.json({ ok: true });
 });
-
 app.delete('/api/categories/:id', auth, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ msg: '无权限' });
   await db.query('DELETE FROM category_config WHERE cat_id = $1', [req.params.id]);
@@ -196,15 +175,11 @@ app.get('/api/budgets', auth, async (_, res) => {
   const r = await db.query('SELECT * FROM budgets');
   res.json(r.rows);
 });
-
 app.post('/api/budgets', auth, async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ msg: '无权限' });
   const { dept_id, category_id, total_amount, warning_rate } = req.body;
   await db.query(
-    `INSERT INTO budgets (dept_id, category_id, total_amount, warning_rate, used_amount)
-     VALUES ($1, $2, $3, COALESCE($4, 80), 0)
-     ON CONFLICT (dept_id, category_id) DO UPDATE
-     SET total_amount = $3, warning_rate = COALESCE($4, 80)`,
+    `INSERT INTO budgets VALUES ($1,$2,$3,0,COALESCE($4,80)) ON CONFLICT (dept_id,category_id) DO UPDATE SET total_amount=$3,warning_rate=COALESCE($4,80)`,
     [dept_id, category_id, total_amount, warning_rate]
   );
   res.json({ ok: true });
@@ -214,31 +189,19 @@ app.get('/api/requests', auth, async (_, res) => {
   const r = await db.query('SELECT * FROM requests ORDER BY created_at DESC');
   res.json(r.rows);
 });
-
 app.post('/api/requests', auth, async (req, res) => {
   const { dept, category, amount, purpose } = req.body;
   const no = 'BUD' + Date.now();
-  const b = (await db.query('SELECT * FROM budgets WHERE dept_id = $1 AND category_id = $2', [dept, category])).rows[0];
+  const b = (await db.query('SELECT * FROM budgets WHERE dept_id=$1 AND category_id=$2', [dept, category])).rows[0];
   if (!b) return res.json({ ok: false, msg: '该部门科目未设置预算' });
   const used = +b.used_amount, total = +b.total_amount;
   if (used + amount > total) return res.json({ ok: false, msg: '超出预算额度' });
-  
-  await db.query(
-    'UPDATE budgets SET used_amount = used_amount + $1 WHERE dept_id = $2 AND category_id = $3',
-    [amount, dept, category]
-  );
-  await db.query(
-    `INSERT INTO requests (request_no, dept_id, category, amount, purpose, applicant_id, status)
-     VALUES ($1, $2, $3, $4, $5, $6, 'approved')`,
-    [no, dept, category, amount, purpose, req.user.id]
-  );
-  
+  await db.query('UPDATE budgets SET used_amount=used_amount+$1 WHERE dept_id=$2 AND category_id=$3', [amount, dept, category]);
+  await db.query(`INSERT INTO requests (request_no,dept_id,category,amount,purpose,applicant_id) VALUES ($1,$2,$3,$4,$5,$6)`, [no, dept, category, amount, purpose, req.user.id]);
   const remain = total - used - amount;
   const pct = (used + amount) / total * 100;
   let warn = null;
-  if (pct >= +b.warning_rate) {
-    warn = `该科目使用率已达${pct.toFixed(1)}%（预警线${b.warning_rate}%）`;
-  }
+  if (pct >= +b.warning_rate) warn = `该科目使用率已达${pct.toFixed(1)}%（预警线${b.warning_rate}%）`;
   res.json({ ok: true, no, remain, warn });
 });
 
@@ -246,19 +209,18 @@ app.post('/user/password', auth, async (req, res) => {
   const { oldPwd, newPwd, confirmPwd } = req.body;
   if (newPwd !== confirmPwd) return res.json({ success: false, msg: '两次新密码不一致' });
   if (newPwd.length < 6) return res.json({ success: false, msg: '密码至少6位' });
-  const u = (await db.query('SELECT * FROM users WHERE id = $1', [req.user.id])).rows[0];
+  const u = (await db.query('SELECT * FROM users WHERE id=$1', [req.user.id])).rows[0];
   if (!await bcrypt.compare(oldPwd, u.password)) return res.json({ success: false, msg: '原密码错误' });
   const hash = await bcrypt.hash(newPwd, 10);
-  await db.query('UPDATE users SET password = $1 WHERE id = $2', [hash, req.user.id]);
+  await db.query('UPDATE users SET password=$1 WHERE id=$2', [hash, req.user.id]);
   res.json({ success: true, msg: '密码修改成功，请重新登录' });
 });
 
 app.get('/api/export/excel', auth, async (_, res) => {
   const rows = (await db.query('SELECT * FROM requests ORDER BY created_at DESC')).rows;
-  const csv = '\uFEFF申请单号,部门,科目,金额,用途,状态,申请时间\n' +
-    rows.map(r =>
-      `"${r.request_no}","${r.dept_id}","${r.category}",${r.amount},"${(r.purpose||'').replace(/"/g,'""')}","${r.status}","${r.created_at}"`
-    ).join('\n');
+  const csv = '\uFEFF申请单号,部门,科目,金额,用途,状态,申请时间\n' + rows.map(r =>
+    `"${r.request_no}","${r.dept_id}","${r.category}",${r.amount},"${(r.purpose||'').replace(/"/g,'""')}","${r.status}","${r.created_at}"`
+  ).join('\n');
   res.setHeader('Content-Type', 'text/csv;charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment;filename=预算记录.csv');
   res.send(csv);
@@ -266,6 +228,4 @@ app.get('/api/export/excel', auth, async (_, res) => {
 
 app.get('/', (_, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-initDatabase().then(() => {
-  app.listen(PORT, () => console.log(`🚀 服务启动 端口${PORT}`));
-});
+initDatabase().then(() => app.listen(PORT, () => console.log(`🚀 运行在端口 ${PORT}`)));

@@ -25,13 +25,17 @@
       </div>
     </div>
   </div>
-
   <div id="mainPage" class="hidden">
     <header class="bg-white shadow px-4 py-3 flex justify-between items-center">
       <h1 class="font-bold text-lg">💰 预算管控系统</h1>
       <div class="flex items-center gap-3">
-        <span id="userInfo" class="text-sm"></span>
-        <button id="logoutBtn" class="text-sm text-slate-500 hover:text-red-500"><i class="fa fa-sign-out"></i> 退出</button>
+        <span id="userInfo" class="text-sm mr-2"></span>
+        <button onclick="openChangePwd()" class="text-sm text-primary hover:text-primary/80 mr-2">
+          <i class="fa fa-key"></i> 修改密码
+        </button>
+        <button id="logoutBtn" class="text-sm text-slate-500 hover:text-red-500">
+          <i class="fa fa-sign-out"></i> 退出
+        </button>
       </div>
     </header>
     <main class="max-w-7xl mx-auto p-4 space-y-6">
@@ -80,15 +84,12 @@
       </section>
     </main>
   </div>
-
 <script>
 const API = '/api';
 let token = localStorage.getItem('token');
 const deptMap = {admin:'综合管理部',sales:'市场营销部',tech:'技术研发部',ops:'运营中心'};
 const catMap = {office:'日常办公费',travel:'差旅交通费',procurement:'固定资产采购',business:'业务招待费',project:'专项项目支出'};
-
 if (token) enterMain();
-
 document.getElementById('loginBtn').addEventListener('click', async () => {
   const res = await fetch(API+'/login', {
     method:'POST', headers:{'Content-Type':'application/json'},
@@ -103,19 +104,19 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   localStorage.setItem('token', token);
   enterMain();
 });
-
 document.getElementById('logoutBtn').addEventListener('click', () => {
   localStorage.removeItem('token');
+  localStorage.removeItem('username');
   location.reload();
 });
-
 async function enterMain() {
   document.getElementById('loginPage').classList.add('hidden');
   document.getElementById('mainPage').classList.remove('hidden');
-  document.getElementById('userInfo').textContent = '已登录';
+  const payload = JSON.parse(atob(token.split('.')[1]));
+  document.getElementById('userInfo').textContent = payload.name || payload.username || '用户';
+  localStorage.setItem('username', payload.name || payload.username);
   loadData();
 }
-
 async function loadData() {
   const [budRes, reqRes] = await Promise.all([
     fetch(API+'/budgets', {headers:{Authorization:'Bearer '+token}}),
@@ -151,7 +152,6 @@ async function loadData() {
     <td class="p-3"><span class="px-2 py-1 rounded text-xs bg-green-100 text-green-700">已通过</span></td></tr>
   `).join('') : '<tr><td colspan="5" class="p-3 text-center text-slate-400">暂无记录</td></tr>';
 }
-
 document.getElementById('form').addEventListener('submit', async e => {
   e.preventDefault();
   const res = await fetch(API+'/requests', {
@@ -176,6 +176,33 @@ document.getElementById('form').addEventListener('submit', async e => {
   loadData();
   e.target.reset();
 });
+
+// 修改密码功能
+async function openChangePwd() {
+  const oldPwd = prompt('请输入原密码：');
+  if (!oldPwd) return;
+  const newPwd = prompt('请输入新密码（至少6位）：');
+  if (!newPwd) return;
+  const confirmPwd = prompt('请再次输入新密码：');
+  if (!confirmPwd) return;
+
+  const res = await fetch('/user/password', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + token
+    },
+    body: JSON.stringify({ oldPwd, newPwd, confirmPwd })
+  });
+
+  const data = await res.json();
+  alert(data.msg);
+  if (data.success) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
+    location.reload();
+  }
+}
 </script>
 </body>
 </html>

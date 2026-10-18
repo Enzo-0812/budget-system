@@ -31,7 +31,6 @@
     .msg{padding:12px;border-radius:6px;margin-top:15px;display:none}
     .msg.success{background:#f0fdf4;color:#166534;display:block}
     .msg.error{background:#fef2f2;color:#991b1b;display:block}
-    .warn{background:#fffbeb;color:#b45309;padding:10px;border-radius:6px;margin-top:10px}
     .dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
     .dash-card{border:1px solid #e2e8f0;border-radius:8px;padding:16px}
     .bar{height:8px;background:#e2e8f0;border-radius:4px;margin-top:8px;overflow:hidden}
@@ -87,7 +86,7 @@
       <div id="v-apply">
         <div class="section">
           <h2>📊 预算总览（单位：万美元）</h2>
-          <div id="dashboard"></div>
+          <div id="dashboard"><p style="color:#94a3b8;padding:20px;text-align:center">加载中...</p></div>
         </div>
         <div class="section">
           <h2>✍️ 提交申请（单位：万美元）</h2>
@@ -95,11 +94,15 @@
             <div class="row">
               <div class="form-item">
                 <label>所属部门</label>
-                <select id="deptSel" required onchange="updateCatOptions()"></select>
+                <select id="deptSel" required onchange="updateCatOptions()">
+                  <option value="">请先选择</option>
+                </select>
               </div>
               <div class="form-item">
                 <label>预算科目</label>
-                <select id="catSel" required></select>
+                <select id="catSel" required>
+                  <option value="">请先选择部门</option>
+                </select>
               </div>
             </div>
             <div class="row">
@@ -129,7 +132,7 @@
                 <th>时间</th>
               </tr>
             </thead>
-            <tbody id="records"></tbody>
+            <tbody id="records"><tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:15px">加载中...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -140,11 +143,15 @@
           <form id="budgetForm" class="row">
             <div class="form-item">
               <label>所属部门</label>
-              <select id="bd" required onchange="updateBudgetCatOptions()"></select>
+              <select id="bd" required onchange="updateBudgetCatOptions()">
+                <option value="">请先选择</option>
+              </select>
             </div>
             <div class="form-item">
               <label>预算科目</label>
-              <select id="bc" required></select>
+              <select id="bc" required>
+                <option value="">请先选择部门</option>
+              </select>
             </div>
             <div class="form-item">
               <label>预算总额（万美元）</label>
@@ -175,7 +182,7 @@
                   <th>状态</th>
                 </tr>
               </thead>
-              <tbody id="budgetAdminTable"></tbody>
+              <tbody id="budgetAdminTable"><tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:15px">加载中...</td></tr></tbody>
             </table>
           </div>
           
@@ -192,7 +199,7 @@
                   <th>状态</th>
                 </tr>
               </thead>
-              <tbody id="budgetSalesTable"></tbody>
+              <tbody id="budgetSalesTable"><tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:15px">加载中...</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -207,8 +214,8 @@
 </div>
 
 <script>
-const API = '/api';
-let token = localStorage.getItem('token');
+const API_BASE = '/api';
+let token = localStorage.getItem('budget_token');
 let user = null;
 
 const DEPARTMENTS = [
@@ -255,56 +262,66 @@ const CATEGORIES_SALES = [
 let deptMap = {};
 DEPARTMENTS.forEach(d => { deptMap[d.id] = d.name; });
 
-if (token) enterMain();
+if (token) {
+  tryEnterMain();
+}
+
+function tryEnterMain() {
+  document.getElementById('loginPage').classList.add('hidden');
+  document.getElementById('mainPage').classList.remove('hidden');
+  document.getElementById('userInfo').textContent = user?.name || '用户';
+  initDeptSelects();
+  loadAllData();
+}
 
 document.getElementById('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
   try {
-    const res = await fetch(API+'/login', {
-      method:'POST', 
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
+    const res = await fetch(API_BASE + '/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         username: document.getElementById('username').value.trim(),
         password: document.getElementById('password').value
       })
     });
-    
-    const d = await res.json();
-    
+
+    const data = await res.json();
+
     if (!res.ok) {
-      alert(d.msg || '登录失败');
+      alert(data.msg || '登录失败');
       return;
     }
-    
-    token = d.token; 
-    localStorage.setItem('token', token);
-    try { 
-      user = JSON.parse(atob(token.split('.')[1])); 
+
+    token = data.token;
+    localStorage.setItem('budget_token', token);
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      user = { id: payload.id, username: payload.username, name: payload.name, role: payload.role };
     } catch {
-      user = { username: d.name, name: d.name, role: 'user' };
+      user = { name: data.name || '用户', role: 'user' };
     }
-    
-    document.getElementById('loginPage').classList.add('hidden');
-    document.getElementById('mainPage').classList.remove('hidden');
-    
-    document.getElementById('userInfo').textContent = user?.name || user?.username || '用户';
-    
-    const deptSelHTML = DEPARTMENTS.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-    document.getElementById('deptSel').innerHTML = deptSelHTML;
-    document.getElementById('bd').innerHTML = deptSelHTML;
-    
-    updateCatOptions();
-    updateBudgetCatOptions();
-    
-    await loadAll();
-    
+
+    tryEnterMain();
   } catch (err) {
-    alert('网络错误，请刷新页面试试');
+    alert('网络错误：无法连接服务器，请稍后重试');
     console.error(err);
   }
 });
 
-function logout() { localStorage.clear(); location.reload(); }
+function logout() {
+  localStorage.removeItem('budget_token');
+  token = null;
+  location.reload();
+}
+
+function initDeptSelects() {
+  const deptSelHTML = DEPARTMENTS.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+  document.getElementById('deptSel').innerHTML = deptSelHTML;
+  document.getElementById('bd').innerHTML = deptSelHTML;
+  updateCatOptions();
+  updateBudgetCatOptions();
+}
 
 function updateCatOptions() {
   const deptId = document.getElementById('deptSel').value;
@@ -332,112 +349,119 @@ function updateBudgetCatOptions() {
   });
 }
 
-async function loadAll() {
+async function loadAllData() {
+  if (!token) return;
   try {
-    const [budgets, reqs] = await Promise.all([
-      fetch(API+'/budgets', {headers:{Authorization:'Bearer '+token}}).then(r=>r.json()),
-      fetch(API+'/requests', {headers:{Authorization:'Bearer '+token}}).then(r=>r.json())
+    const [budgetsRes, reqsRes] = await Promise.all([
+      fetch(API_BASE + '/budgets', { headers: { 'Authorization': 'Bearer ' + token } }),
+      fetch(API_BASE + '/requests', { headers: { 'Authorization': 'Bearer ' + token } })
     ]);
 
-    if (budgets.length === 0) {
-      document.getElementById('initTip').textContent = '💡 首次使用：保存任意一条预算后，系统会自动导入全部预设数据';
-    } else {
-      document.getElementById('initTip').textContent = '';
+    if (!budgetsRes.ok || !reqsRes.ok) {
+      logout();
+      return;
     }
 
+    const budgets = await budgetsRes.json();
+    const requests = await reqsRes.json();
+
     renderDashboard(budgets);
-    renderBudgetTable(budgets);
-
-    document.getElementById('records').innerHTML = reqs.length ? reqs.map(r => {
-      const amountWan = (+r.amount / 10000).toFixed(2);
-      const catName = getCatName(r.category);
-      return `
-      <tr>
-        <td>${r.request_no}</td>
-        <td>${deptMap[r.dept_id] || r.dept_id}</td>
-        <td>${catName}</td>
-        <td>$${amountWan} 万</td>
-        <td><span style="color:#16a34a">已通过</span></td>
-        <td>${(r.created_at || '').slice(0, 16)}</td>
-      </tr>`;
-    }).join('') : '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:15px">暂无记录</td></tr>';
-
+    renderBudgetTables(budgets);
+    renderRecords(requests);
   } catch (err) {
-    console.error('加载失败：', err);
+    console.error('加载数据失败：', err);
   }
 }
 
 function getCatName(catId) {
   const all = [...CATEGORIES_ADMIN, ...CATEGORIES_SALES];
-  const c = all.find(x => x.id === catId);
-  return c ? c.name : catId;
+  const found = all.find(c => c.id === catId);
+  return found ? found.name : catId;
 }
 
 function renderDashboard(budgets) {
   const dash = document.getElementById('dashboard');
-  dash.innerHTML = '';
-  
+  if (!budgets || budgets.length === 0) {
+    dash.innerHTML = '<p style="color:#94a3b8;padding:20px;text-align:center">暂无预算数据，请先设置</p>';
+    return;
+  }
+
+  let html = '';
   DEPARTMENTS.forEach(dept => {
     const deptBudgets = budgets.filter(b => b.dept_id === dept.id);
     if (deptBudgets.length === 0) return;
-    
-    const total = deptBudgets.reduce((sum, b) => sum + +b.total_amount, 0);
-    const used = deptBudgets.reduce((sum, b) => sum + +b.used_amount, 0);
+
+    const total = deptBudgets.reduce((sum, b) => sum + Number(b.total_amount), 0);
+    const used = deptBudgets.reduce((sum, b) => sum + Number(b.used_amount), 0);
     const pct = total > 0 ? (used / total * 100) : 0;
     const totalWan = (total / 10000).toFixed(2);
     const usedWan = (used / 10000).toFixed(2);
-    const cls = pct >= 90 ? 'bar-red' : pct >= 80 ? 'bar-yellow' : 'bar-green';
-    
-    dash.innerHTML += `
+    const barClass = pct >= 90 ? 'bar-red' : pct >= 80 ? 'bar-yellow' : 'bar-green';
+
+    html += `
       <div class="dash-card">
         <h3 style="font-size:15px;color:#475569;margin-bottom:8px">${dept.name}</h3>
         <p style="font-size:20px;font-weight:bold">$${usedWan} / ${totalWan} 万</p>
         <p style="font-size:13px;color:#64748b;margin:4px 0 8px">使用率 ${pct.toFixed(1)}%</p>
-        <div class="bar"><div class="bar-fill ${cls}" style="width:${Math.min(pct,100)}%"></div></div>
+        <div class="bar"><div class="bar-fill ${barClass}" style="width:${Math.min(pct, 100)}%"></div></div>
       </div>`;
   });
-  
-  if (!dash.innerHTML) {
-    dash.innerHTML = '<p style="color:#94a3b8;padding:20px;text-align:center">请先在「预算设置」中填写预算</p>';
-  }
+  dash.innerHTML = html || '<p style="color:#94a3b8;padding:20px;text-align:center">暂无数据</p>';
 }
 
-function renderBudgetTable(budgets) {
+function renderBudgetTables(budgets) {
   const adminIds = CATEGORIES_ADMIN.map(c => c.id);
-  const adminBudgets = budgets.filter(b => adminIds.includes(b.category));
-  document.getElementById('budgetAdminTable').innerHTML = adminBudgets.length 
-    ? adminBudgets.map(b => renderBudgetRow(b)).join('')
-    : '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:15px">暂未设置</td></tr>';
-  
+  const adminData = budgets.filter(b => adminIds.includes(b.category));
+  document.getElementById('budgetAdminTable').innerHTML = adminData.length
+    ? adminData.map(renderBudgetRow).join('')
+    : '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:15px">暂无数据</td></tr>';
+
   const salesIds = CATEGORIES_SALES.map(c => c.id);
-  const salesBudgets = budgets.filter(b => salesIds.includes(b.category));
-  document.getElementById('budgetSalesTable').innerHTML = salesBudgets.length 
-    ? salesBudgets.map(b => renderBudgetRow(b)).join('')
-    : '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:15px">暂未设置</td></tr>';
+  const salesData = budgets.filter(b => salesIds.includes(b.category));
+  document.getElementById('budgetSalesTable').innerHTML = salesData.length
+    ? salesData.map(renderBudgetRow).join('')
+    : '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:15px">暂无数据</td></tr>';
 }
 
 function renderBudgetRow(b) {
-  const totalWan = (+b.total_amount / 10000).toFixed(2);
-  const usedWan = (+b.used_amount / 10000).toFixed(2);
-  const pct = +b.total_amount > 0 ? (+b.used_amount / +b.total_amount * 100) : 0;
-  const warnRate = +b.warning_rate || 80;
-  
-  let rateClass = 'rate-good';
-  let statusText = '正常';
+  const totalWan = (Number(b.total_amount) / 10000).toFixed(2);
+  const usedWan = (Number(b.used_amount) / 10000).toFixed(2);
+  const pct = Number(b.total_amount) > 0 ? (Number(b.used_amount) / Number(b.total_amount) * 100) : 0;
+  const warnRate = Number(b.warning_rate) || 80;
+
+  let rateClass = 'rate-good', statusText = '正常';
   if (pct >= warnRate) { rateClass = 'rate-warn'; statusText = '预警'; }
   if (pct >= 90) { rateClass = 'rate-bad'; statusText = '超支风险'; }
-  
-  const catName = getCatName(b.category);
-  
+
   return `
     <tr>
       <td>${deptMap[b.dept_id] || b.dept_id}</td>
-      <td>${catName}</td>
+      <td>${getCatName(b.category)}</td>
       <td>$${totalWan}</td>
       <td>$${usedWan}</td>
       <td class="${rateClass}">${pct.toFixed(1)}%</td>
       <td class="${rateClass}">${statusText}</td>
     </tr>`;
+}
+
+function renderRecords(records) {
+  const tbody = document.getElementById('records');
+  if (!records || records.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:15px">暂无记录</td></tr>';
+    return;
+  }
+  tbody.innerHTML = records.map(r => {
+    const amountWan = (Number(r.amount) / 10000).toFixed(2);
+    return `
+      <tr>
+        <td>${r.request_no}</td>
+        <td>${deptMap[r.dept_id] || r.dept_id}</td>
+        <td>${getCatName(r.category)}</td>
+        <td>$${amountWan} 万</td>
+        <td><span style="color:#16a34a">已通过</span></td>
+        <td>${(r.created_at || '').slice(0, 16)}</td>
+      </tr>`;
+  }).join('');
 }
 
 document.querySelectorAll('.tab').forEach(tab => {
@@ -453,91 +477,135 @@ document.querySelectorAll('.tab').forEach(tab => {
 
 document.getElementById('applyForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const amountWan = +document.getElementById('amount').value;
-  const amountYuan = Math.round(amountWan * 10000);
-  
-  const res = await fetch(API+'/requests', {
-    method:'POST',
-    headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token},
-    body:JSON.stringify({
-      dept: document.getElementById('deptSel').value,
-      category: document.getElementById('catSel').value,
-      amount: amountYuan,
-      purpose: document.getElementById('purpose').value
-    })
-  });
-  const d = await res.json();
-  const box = document.getElementById('applyMsg');
-  box.className = 'msg ' + (d.ok ? 'success' : 'error');
-  
-  const remainWan = ((d.remain || 0) / 10000).toFixed(2);
-  box.textContent = d.ok 
-    ? `✅ 通过！申请单号：${d.no}，剩余额度：$${remainWan} 万${d.warn ? '\n⚠️ ' + d.warn : ''}`
-    : `❌ ${d.msg || '提交失败'}`;
-  
-  loadAll();
-  e.target.reset();
+  if (!token) return alert('请先登录');
+
+  try {
+    const amountWan = Number(document.getElementById('amount').value);
+    const amountYuan = Math.round(amountWan * 10000);
+
+    const res = await fetch(API_BASE + '/requests', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({
+        dept: document.getElementById('deptSel').value,
+        category: document.getElementById('catSel').value,
+        amount: amountYuan,
+        purpose: document.getElementById('purpose').value
+      })
+    });
+
+    const data = await res.json();
+    const msgBox = document.getElementById('applyMsg');
+    msgBox.className = 'msg ' + (data.ok ? 'success' : 'error');
+
+    if (data.ok) {
+      const remainWan = (Number(data.remain || 0) / 10000).toFixed(2);
+      msgBox.textContent = `✅ 通过！申请单号：${data.no}，剩余额度：$${remainWan} 万${data.warn ? ' | ' + data.warn : ''}`;
+      loadAllData();
+      e.target.reset();
+    } else {
+      msgBox.textContent = '❌ ' + (data.msg || '提交失败');
+    }
+  } catch (err) {
+    alert('网络错误，请重试');
+    console.error(err);
+  }
 });
 
 document.getElementById('budgetForm').addEventListener('submit', async e => {
   e.preventDefault();
-  if (user?.role !== 'admin') return alert('仅管理员可操作');
-  
-  const totalWan = +document.getElementById('bt').value;
-  const totalYuan = Math.round(totalWan * 10000);
-  
-  const res = await fetch(API+'/budgets', {
-    method:'POST',
-    headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token},
-    body:JSON.stringify({
-      dept_id: document.getElementById('bd').value,
-      category_id: document.getElementById('bc').value,
-      total_amount: totalYuan,
-      warning_rate: +document.getElementById('bw').value
-    })
-  });
-  
-  const d = await res.json();
-  alert(d.ok ? '保存成功！' : '保存失败');
-  loadAll();
+  if (!token) return alert('请先登录');
+
+  try {
+    const totalWan = Number(document.getElementById('bt').value);
+    const totalYuan = Math.round(totalWan * 10000);
+
+    const res = await fetch(API_BASE + '/budgets', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({
+        dept_id: document.getElementById('bd').value,
+        category_id: document.getElementById('bc').value,
+        total_amount: totalYuan,
+        warning_rate: Number(document.getElementById('bw').value)
+      })
+    });
+
+    const data = await res.json();
+    alert(data.ok ? '保存成功！' : '保存失败：' + (data.msg || ''));
+    loadAllData();
+  } catch (err) {
+    alert('网络错误，请重试');
+  }
 });
 
+async function resetDatabase() {
+  if (!confirm('确定要重置吗？会清除所有数据重新初始化！')) return;
+  const resultEl = document.getElementById('resetResult');
+  resultEl.textContent = '正在重置...';
+  resultEl.style.color = '#666';
+
+  try {
+    const res = await fetch(API_BASE + '/admin/reset-db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: 'reset-2026' })
+    });
+
+    const data = await res.json();
+    resultEl.textContent = data.msg || (data.ok ? '重置成功！' : '重置失败');
+    resultEl.style.color = data.ok ? '#16a34a' : '#dc2626';
+
+    if (data.ok) {
+      localStorage.removeItem('budget_token');
+      token = null;
+      setTimeout(() => location.reload(), 2000);
+    }
+  } catch (err) {
+    resultEl.textContent = '重置失败：网络错误';
+    resultEl.style.color = '#dc2626';
+  }
+}
+
 async function openChangePwd() {
+  if (!token) return;
   const oldPwd = prompt('请输入原密码：');
   if (!oldPwd) return;
   const newPwd = prompt('请输入新密码（至少6位）：');
   if (!newPwd || newPwd.length < 6) return alert('密码至少6位');
   const confirmPwd = prompt('请再次输入新密码：');
   if (newPwd !== confirmPwd) return alert('两次输入不一致');
-  
-  const res = await fetch('/user/password', {
-    method:'POST',
-    headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token},
-    body:JSON.stringify({oldPwd, newPwd, confirmPwd})
-  });
-  const d = await res.json();
-  alert(d.msg);
-  if (d.success) logout();
+
+  try {
+    const res = await fetch('/user/password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({ oldPwd, newPwd, confirmPwd })
+    });
+    const data = await res.json();
+    alert(data.msg);
+    if (data.success) logout();
+  } catch {
+    alert('网络错误');
+  }
 }
 
 function exportExcel() {
+  if (!token) return alert('请先登录');
   const a = document.createElement('a');
-  a.href = API + '/export/excel';
-  a.download = '预算申请记录_' + new Date().toLocaleDateString() + '.csv';
+  a.href = API_BASE + '/export/excel';
+  a.target = '_blank';
+  a.download = '预算记录_' + new Date().toLocaleDateString() + '.csv';
   a.click();
-}
-
-async function resetDatabase() {
-  if (!confirm('确定要重置吗？会清除旧数据重新生成初始内容！')) return;
-  const res = await fetch('/api/admin/reset-db', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ secret: 'reset-2026' })
-  });
-  const d = await res.json();
-  document.getElementById('resetResult').textContent = d.msg || d.error || '操作完成';
-  document.getElementById('resetResult').style.color = d.ok ? '#16a34a' : '#dc2626';
-  if (d.ok) setTimeout(() => location.reload(), 1500);
 }
 </script>
 </body>

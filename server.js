@@ -1,6 +1,5 @@
 const express = require('express');
 const { Pool } = require('pg');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const path = require('path');
@@ -32,7 +31,6 @@ function auth(req, res, next) {
 
 async function initDatabase() {
   try {
-    // 建表
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -93,10 +91,11 @@ async function initDatabase() {
       await db.query(`INSERT INTO category_config VALUES ($1,$2) ON CONFLICT (cat_id) DO UPDATE SET display_name=$2`, [id, name]);
     }
 
-    // 👇 关键：清空所有用户 → 重新生成（密码强制重置）
+    // 👇 清空用户 → 明文密码，直接匹配
     await db.query('DELETE FROM users');
-
+    
     const users = [
+      { username: 'admin', name: '系统管理员', password: '123456', department: 'admin', role: 'admin' },
       { username: 'Enzo', name: 'Enzo', password: 'ZZY1995zxakk', department: 'admin', role: 'admin' },
       { username: 'SHI', name: 'SHI', password: '123456', department: 'finance', role: 'user' },
       { username: 'ZHAN', name: 'ZHAN', password: '123456', department: 'director', role: 'user' },
@@ -110,25 +109,25 @@ async function initDatabase() {
     ];
 
     for (const u of users) {
-      const hash = await bcrypt.hash(u.password, 10);
       await db.query(
         'INSERT INTO users (username, name, password, department, role) VALUES ($1, $2, $3, $4, $5)',
-        [u.username, u.name, hash, u.department, u.role]
+        [u.username, u.name, u.password, u.department, u.role]
       );
     }
 
-    console.log('✅ 用户全部重建完成');
+    console.log('✅ 用户重建完成，可直接登录');
   } catch (err) {
-    console.error('❌ 初始化失败:', err);
+    console.error('❌', err);
   }
 }
 
+// 登录：直接比对明文密码
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
   const u = (await db.query('SELECT * FROM users WHERE username = $1', [username])).rows[0];
   if (!u) return res.status(400).json({ msg: '账号或密码错误' });
-  const ok = await bcrypt.compare(password, u.password);
-  if (!ok) return res.status(400).json({ msg: '账号或密码错误' });
+  if (u.password !== password) return res.status(400).json({ msg: '账号或密码错误' });
+  
   const token = jwt.sign(
     { id: u.id, username: u.username, name: u.name, role: u.role, dept: u.department },
     JWT_SECRET,
@@ -203,14 +202,14 @@ app.post('/api/requests', auth, async (req, res) => {
   res.json({ ok: true, no, remain, warn });
 });
 
+// 修改密码（先简化，直接覆盖）
 app.post('/user/password', auth, async (req, res) => {
   const { oldPwd, newPwd, confirmPwd } = req.body;
   if (newPwd !== confirmPwd) return res.json({ success: false, msg: '两次新密码不一致' });
   if (newPwd.length < 6) return res.json({ success: false, msg: '密码至少6位' });
   const u = (await db.query('SELECT * FROM users WHERE id=$1', [req.user.id])).rows[0];
-  if (!await bcrypt.compare(oldPwd, u.password)) return res.json({ success: false, msg: '原密码错误' });
-  const hash = await bcrypt.hash(newPwd, 10);
-  await db.query('UPDATE users SET password=$1 WHERE id=$2', [hash, req.user.id]);
+  if (u.password !== oldPwd) return res.json({ success: false, msg: '原密码错误' });
+  await db.query('UPDATE users SET password=$1 WHERE id=$2', [newPwd, req.user.id]);
   res.json({ success: true, msg: '密码修改成功，请重新登录' });
 });
 

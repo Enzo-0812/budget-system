@@ -31,6 +31,7 @@ function auth(req, res, next) {
 
 async function initDatabase() {
   try {
+    // 建表
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -79,6 +80,20 @@ async function initDatabase() {
       )
     `);
 
+    // 👇 强制重建表 + 清空所有旧数据
+    await db.query('DROP TABLE IF EXISTS users CASCADE');
+    await db.query(`
+      CREATE TABLE users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(50) UNIQUE NOT NULL,
+        name VARCHAR(50),
+        password VARCHAR(255) NOT NULL,
+        department VARCHAR(50),
+        role VARCHAR(20) DEFAULT 'user',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // 部门
     const depts = [['admin','综合管理部'],['finance','财务部'],['director','管理层']];
     for (const [id, name] of depts) {
@@ -91,9 +106,7 @@ async function initDatabase() {
       await db.query(`INSERT INTO category_config VALUES ($1,$2) ON CONFLICT (cat_id) DO UPDATE SET display_name=$2`, [id, name]);
     }
 
-    // 👇 清空用户 → 明文密码，直接匹配
-    await db.query('DELETE FROM users');
-    
+    // 全新写入用户 —— 明文密码直接比对
     const users = [
       { username: 'admin', name: '系统管理员', password: '123456', department: 'admin', role: 'admin' },
       { username: 'Enzo', name: 'Enzo', password: 'ZZY1995zxakk', department: 'admin', role: 'admin' },
@@ -115,13 +128,13 @@ async function initDatabase() {
       );
     }
 
-    console.log('✅ 用户重建完成，可直接登录');
+    console.log('✅ 数据库完全重建 + 用户写入成功');
   } catch (err) {
     console.error('❌', err);
   }
 }
 
-// 登录：直接比对明文密码
+// 登录：直接明文匹配，无加密
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
   const u = (await db.query('SELECT * FROM users WHERE username = $1', [username])).rows[0];
@@ -202,7 +215,6 @@ app.post('/api/requests', auth, async (req, res) => {
   res.json({ ok: true, no, remain, warn });
 });
 
-// 修改密码（先简化，直接覆盖）
 app.post('/user/password', auth, async (req, res) => {
   const { oldPwd, newPwd, confirmPwd } = req.body;
   if (newPwd !== confirmPwd) return res.json({ success: false, msg: '两次新密码不一致' });

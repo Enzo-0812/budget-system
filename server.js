@@ -18,9 +18,13 @@ const SECRET = process.env.JWT_SECRET || 'budget-secret-2026';
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false
+    rejectUnauthorized: false,
+    checkServerIdentity: (host, cert) => {
+      return undefined;
+    }
   }
 });
+
 async function initDB() {
   await db.query(`
 CREATE TABLE IF NOT EXISTS users (

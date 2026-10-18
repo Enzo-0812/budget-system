@@ -19,12 +19,8 @@ const db = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false
-  },
-  types: {
-    parseArray: false
   }
 });
-
 async function initDB() {
   await db.query(`
 CREATE TABLE IF NOT EXISTS users (

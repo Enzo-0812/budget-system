@@ -27,7 +27,6 @@ function auth(req, res, next) {
   }
 }
 
-// 手动重置接口
 app.post('/api/admin/reset-db', async (req, res) => {
   try {
     if (req.body.secret !== 'reset-2026') {
@@ -36,12 +35,10 @@ app.post('/api/admin/reset-db', async (req, res) => {
     
     console.log('🔄 开始重置数据库...');
     
-    // 重建所有表
     await db.query('DROP TABLE IF EXISTS requests CASCADE');
     await db.query('DROP TABLE IF EXISTS budgets CASCADE');
     await db.query('DROP TABLE IF EXISTS users CASCADE');
     
-    // 用户表
     await db.query(`
       CREATE TABLE users (
         id SERIAL PRIMARY KEY,
@@ -54,7 +51,6 @@ app.post('/api/admin/reset-db', async (req, res) => {
       )
     `);
     
-    // 插入用户 —— 明文存储方便比对调试
     await db.query(`
       INSERT INTO users (username, name, password, department, role) VALUES
       ('admin', '系统管理员', '123456', 'zonghe', 'admin'),
@@ -62,7 +58,6 @@ app.post('/api/admin/reset-db', async (req, res) => {
     `);
     console.log('✅ 用户创建成功: admin/123456');
     
-    // 预算表
     await db.query(`
       CREATE TABLE budgets (
         id SERIAL PRIMARY KEY,
@@ -75,7 +70,6 @@ app.post('/api/admin/reset-db', async (req, res) => {
       )
     `);
     
-    // 申请表
     await db.query(`
       CREATE TABLE requests (
         id SERIAL PRIMARY KEY,
@@ -90,7 +84,6 @@ app.post('/api/admin/reset-db', async (req, res) => {
       )
     `);
     
-    // 预算数据
     const budgets = [
       ['zonghe','staff_pay',326.02,128.13],
       ['zonghe','salary_total',230.98,86.26],
@@ -135,7 +128,6 @@ app.post('/api/admin/reset-db', async (req, res) => {
   }
 });
 
-// 登录接口 —— 最简化版
 app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;

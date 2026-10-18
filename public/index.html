@@ -81,8 +81,6 @@
     <div class="container">
       <div class="tabs">
         <button class="tab active" data-view="apply">预算申请</button>
-        <button class="tab" data-view="dept">部门管理</button>
-        <button class="tab" data-view="cat">科目管理</button>
         <button class="tab" data-view="budget">预算设置</button>
       </div>
 
@@ -137,73 +135,6 @@
         </div>
       </div>
 
-      <!-- 部门管理页面 -->
-      <div id="v-dept" class="hidden">
-        <div class="section">
-          <h2>🏢 部门管理</h2>
-          <form id="deptForm" class="row">
-            <div class="form-item">
-              <label>部门标识</label>
-              <input type="text" id="deptId" placeholder="如 zonghe" required />
-            </div>
-            <div class="form-item">
-              <label>部门名称</label>
-              <input type="text" id="deptName" placeholder="如 综合部" required />
-            </div>
-            <div class="row-full">
-              <button type="submit" class="btn" style="width:auto">保存部门</button>
-            </div>
-          </form>
-          <table>
-            <thead>
-              <tr>
-                <th>部门标识</th>
-                <th>部门名称</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody id="deptList"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- 科目管理页面 -->
-      <div id="v-cat" class="hidden">
-        <div class="section">
-          <h2>📑 科目管理</h2>
-          <form id="catForm" class="row">
-            <div class="form-item">
-              <label>科目分类</label>
-              <select id="catTypeSel">
-                <option value="admin">管理费用</option>
-                <option value="sales">销售费用</option>
-              </select>
-            </div>
-            <div class="form-item">
-              <label>科目标识</label>
-              <input type="text" id="catId" placeholder="如 salary" required />
-            </div>
-            <div class="form-item">
-              <label>科目名称</label>
-              <input type="text" id="catName" placeholder="如 职工薪酬" required />
-            </div>
-            <div class="row-full">
-              <button type="submit" class="btn" style="width:auto">保存科目</button>
-            </div>
-          </form>
-          <h3 style="margin:20px 0 10px">管理费用科目</h3>
-          <table>
-            <thead><tr><th>标识</th><th>名称</th><th>操作</th></tr></thead>
-            <tbody id="catAdminList"></tbody>
-          </table>
-          <h3 style="margin:20px 0 10px">销售费用科目</h3>
-          <table>
-            <thead><tr><th>标识</th><th>名称</th><th>操作</th></tr></thead>
-            <tbody id="catSalesList"></tbody>
-          </table>
-        </div>
-      </div>
-
       <!-- 预算设置页面 -->
       <div id="v-budget" class="hidden">
         <div class="section">
@@ -211,7 +142,7 @@
           <form id="budgetForm" class="row">
             <div class="form-item">
               <label>所属部门</label>
-              <select id="bd" required></select>
+              <select id="bd" required onchange="updateBudgetCatOptions()"></select>
             </div>
             <div class="form-item">
               <label>预算科目</label>
@@ -227,6 +158,7 @@
             </div>
             <div class="row-full">
               <button type="submit" class="btn" style="width:auto">保存预算</button>
+              <p id="initTip" style="color:#2563eb;margin-top:8px"></p>
             </div>
           </form>
           
@@ -275,7 +207,7 @@ const API = '/api';
 let token = localStorage.getItem('token');
 let user = null;
 
-// 基础配置：部门、科目
+// 基础配置
 const DEPARTMENTS = [
   { id: 'zonghe', name: '综合部' },
   { id: 'shangwu', name: '商务部' },
@@ -287,8 +219,8 @@ const DEPARTMENTS = [
 ];
 
 const CATEGORIES_ADMIN = [
-  { id: 'salary_total', name: '工资总额' },
   { id: 'staff_pay', name: '职工薪酬' },
+  { id: 'salary_total', name: '工资总额' },
   { id: 'welfare', name: '福利费用' },
   { id: 'fixed_asset_dep', name: '固定资产折旧' },
   { id: 'low_value_amort', name: '低值易耗品摊销' },
@@ -305,8 +237,8 @@ const CATEGORIES_ADMIN = [
 ];
 
 const CATEGORIES_SALES = [
-  { id: 'salary_total_s', name: '工资总额' },
   { id: 'staff_pay_s', name: '职工薪酬' },
+  { id: 'salary_total_s', name: '工资总额' },
   { id: 'welfare_s', name: '福利费用' },
   { id: 'office_s', name: '办公费' },
   { id: 'transport_s', name: '交通费' },
@@ -318,11 +250,6 @@ const CATEGORIES_SALES = [
 ];
 
 let deptMap = {};
-let catMap = {};
-let catTypeMap = {};
-
-CATEGORIES_ADMIN.forEach(c => { catMap[c.id] = c.name; catTypeMap[c.id] = 'admin'; });
-CATEGORIES_SALES.forEach(c => { catMap[c.id] = c.name; catTypeMap[c.id] = 'sales'; });
 DEPARTMENTS.forEach(d => { deptMap[d.id] = d.name; });
 
 if (token) enterMain();
@@ -350,6 +277,16 @@ async function enterMain() {
   document.getElementById('loginPage').classList.add('hidden');
   document.getElementById('mainPage').classList.remove('hidden');
   document.getElementById('userInfo').textContent = user?.name || user?.username || '用户';
+  
+  // 填充部门下拉
+  const deptSelHTML = DEPARTMENTS.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+  document.getElementById('deptSel').innerHTML = deptSelHTML;
+  document.getElementById('bd').innerHTML = deptSelHTML;
+  
+  // 触发科目加载
+  updateCatOptions();
+  updateBudgetCatOptions();
+  
   await loadAll();
 }
 
@@ -357,8 +294,19 @@ function updateCatOptions() {
   const deptId = document.getElementById('deptSel').value;
   const catSel = document.getElementById('catSel');
   catSel.innerHTML = '';
-  
-  // 经营开发中心只显示销售费用科目，其他部门只显示管理费用科目
+  const cats = deptId === 'jingying' ? CATEGORIES_SALES : CATEGORIES_ADMIN;
+  cats.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    catSel.appendChild(opt);
+  });
+}
+
+function updateBudgetCatOptions() {
+  const deptId = document.getElementById('bd').value;
+  const catSel = document.getElementById('bc');
+  catSel.innerHTML = '';
   const cats = deptId === 'jingying' ? CATEGORIES_SALES : CATEGORIES_ADMIN;
   cats.forEach(c => {
     const opt = document.createElement('option');
@@ -370,57 +318,33 @@ function updateCatOptions() {
 
 async function loadAll() {
   try {
-    const [depts, cats, budgets, reqs] = await Promise.all([
-      fetch(API+'/depts', {headers:{Authorization:'Bearer '+token}}).then(r=>r.json()),
-      fetch(API+'/categories', {headers:{Authorization:'Bearer '+token}}).then(r=>r.json()),
+    const [budgets, reqs] = await Promise.all([
       fetch(API+'/budgets', {headers:{Authorization:'Bearer '+token}}).then(r=>r.json()),
       fetch(API+'/requests', {headers:{Authorization:'Bearer '+token}}).then(r=>r.json())
     ]);
 
-    // 填充部门下拉
-    const deptSelHTML = DEPARTMENTS.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-    document.getElementById('deptSel').innerHTML = deptSelHTML;
-    document.getElementById('bd').innerHTML = deptSelHTML;
-    
-    // 科目下拉默认选第一个部门后刷新
-    updateCatOptions();
-    
-    // 预算一览
+    // 如果是空库，显示提示
+    if (budgets.length === 0) {
+      document.getElementById('initTip').textContent = '💡 首次使用：保存任意一条预算后，系统会自动导入全部预设数据';
+    } else {
+      document.getElementById('initTip').textContent = '';
+    }
+
+    // 预算总览
     renderDashboard(budgets);
     
-    // 部门列表
-    document.getElementById('deptList').innerHTML = DEPARTMENTS.map(d => `
-      <tr>
-        <td>${d.id}</td>
-        <td>${d.name}</td>
-        <td><span style="color:#94a3b8">系统预置</span></td>
-      </tr>`).join('');
-
-    // 科目列表
-    document.getElementById('catAdminList').innerHTML = CATEGORIES_ADMIN.map(c => `
-      <tr>
-        <td>${c.id}</td>
-        <td>${c.name}</td>
-        <td><span style="color:#94a3b8">系统预置</span></td>
-      </tr>`).join('');
-    document.getElementById('catSalesList').innerHTML = CATEGORIES_SALES.map(c => `
-      <tr>
-        <td>${c.id}</td>
-        <td>${c.name}</td>
-        <td><span style="color:#94a3b8">系统预置</span></td>
-      </tr>`).join('');
-
-    // 预算设置一览
+    // 预算一览
     renderBudgetTable(budgets);
 
     // 申请记录
     document.getElementById('records').innerHTML = reqs.length ? reqs.map(r => {
       const amountWan = (+r.amount / 10000).toFixed(2);
+      const catName = getCatName(r.category);
       return `
       <tr>
         <td>${r.request_no}</td>
         <td>${deptMap[r.dept_id] || r.dept_id}</td>
-        <td>${catMap[r.category] || r.category}</td>
+        <td>${catName}</td>
         <td>$${amountWan} 万</td>
         <td><span style="color:#16a34a">已通过</span></td>
         <td>${(r.created_at || '').slice(0, 16)}</td>
@@ -430,6 +354,12 @@ async function loadAll() {
   } catch (err) {
     console.error('加载失败：', err);
   }
+}
+
+function getCatName(catId) {
+  const all = [...CATEGORIES_ADMIN, ...CATEGORIES_SALES];
+  const c = all.find(x => x.id === catId);
+  return c ? c.name : catId;
 }
 
 function renderDashboard(budgets) {
@@ -457,19 +387,21 @@ function renderDashboard(budgets) {
   });
   
   if (!dash.innerHTML) {
-    dash.innerHTML = '<p style="color:#94a3b8;padding:20px;text-align:center">请先在「预算设置」中填写各科目预算</p>';
+    dash.innerHTML = '<p style="color:#94a3b8;padding:20px;text-align:center">请先在「预算设置」中填写预算</p>';
   }
 }
 
 function renderBudgetTable(budgets) {
   // 管理费用表
-  const adminBudgets = budgets.filter(b => catTypeMap[b.category] === 'admin');
+  const adminIds = CATEGORIES_ADMIN.map(c => c.id);
+  const adminBudgets = budgets.filter(b => adminIds.includes(b.category));
   document.getElementById('budgetAdminTable').innerHTML = adminBudgets.length 
     ? adminBudgets.map(b => renderBudgetRow(b)).join('')
     : '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:15px">暂未设置</td></tr>';
   
   // 销售费用表
-  const salesBudgets = budgets.filter(b => catTypeMap[b.category] === 'sales');
+  const salesIds = CATEGORIES_SALES.map(c => c.id);
+  const salesBudgets = budgets.filter(b => salesIds.includes(b.category));
   document.getElementById('budgetSalesTable').innerHTML = salesBudgets.length 
     ? salesBudgets.map(b => renderBudgetRow(b)).join('')
     : '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:15px">暂未设置</td></tr>';
@@ -479,17 +411,19 @@ function renderBudgetRow(b) {
   const totalWan = (+b.total_amount / 10000).toFixed(2);
   const usedWan = (+b.used_amount / 10000).toFixed(2);
   const pct = +b.total_amount > 0 ? (+b.used_amount / +b.total_amount * 100) : 0;
-  const warnRate = +b.warning_rate;
+  const warnRate = +b.warning_rate || 80;
   
   let rateClass = 'rate-good';
   let statusText = '正常';
   if (pct >= warnRate) { rateClass = 'rate-warn'; statusText = '预警'; }
   if (pct >= 90) { rateClass = 'rate-bad'; statusText = '超支风险'; }
   
+  const catName = getCatName(b.category);
+  
   return `
     <tr>
       <td>${deptMap[b.dept_id] || b.dept_id}</td>
-      <td>${catMap[b.category] || b.category}</td>
+      <td>${catName}</td>
       <td>$${totalWan}</td>
       <td>$${usedWan}</td>
       <td class="${rateClass}">${pct.toFixed(1)}%</td>
@@ -503,7 +437,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
     const view = tab.dataset.view;
-    ['apply', 'dept', 'cat', 'budget'].forEach(v => {
+    ['apply', 'budget'].forEach(v => {
       document.getElementById('v-' + v).classList.toggle('hidden', v !== view);
     });
   });
@@ -546,7 +480,7 @@ document.getElementById('budgetForm').addEventListener('submit', async e => {
   const totalWan = +document.getElementById('bt').value;
   const totalYuan = Math.round(totalWan * 10000);
   
-  await fetch(API+'/budgets', {
+  const res = await fetch(API+'/budgets', {
     method:'POST',
     headers:{'Content-Type':'application/json', 'Authorization':'Bearer '+token},
     body:JSON.stringify({
@@ -555,9 +489,10 @@ document.getElementById('budgetForm').addEventListener('submit', async e => {
       total_amount: totalYuan,
       warning_rate: +document.getElementById('bw').value
     })
-  });
+  );
   
-  alert('预算保存成功！');
+  const d = await res.json();
+  alert(d.ok ? '保存成功！刷新后全部预设数据将自动显示' : '保存失败');
   loadAll();
 });
 

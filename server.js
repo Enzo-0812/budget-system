@@ -23,164 +23,150 @@ function auth(req, res, next) {
     req.user = jwt.verify(token, JWT_SECRET);
     next();
   } catch {
-    return res.status(401).json({ msg: '登录已过期' });
+    return res.status(401).json({ msg: '登录已过期，请重新登录' });
   }
 }
 
-// 一次性初始化标记
-let initialized = false;
-
-async function initOnce() {
-  if (initialized) return;
-  try {
-    console.log('🔍 检查数据库状态...');
-    
-    // 检查表是否存在
-    const res = await db.query(`
-      SELECT to_regclass('public.users') AS exists
-    `);
-    
-    if (!res.rows[0].exists) {
-      console.log('📦 首次初始化数据库...');
-      
-      // 用户表
-      await db.query(`
-        CREATE TABLE users (
-          id SERIAL PRIMARY KEY,
-          username VARCHAR(50) UNIQUE NOT NULL,
-          name VARCHAR(50),
-          password VARCHAR(255) NOT NULL,
-          department VARCHAR(50),
-          role VARCHAR(20) DEFAULT 'user',
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      
-      // 预算表
-      await db.query(`
-        CREATE TABLE budgets (
-          id SERIAL PRIMARY KEY,
-          dept_id VARCHAR(20) NOT NULL,
-          category_id VARCHAR(30) NOT NULL,
-          total_amount NUMERIC(15,2) DEFAULT 0,
-          used_amount NUMERIC(15,2) DEFAULT 0,
-          warning_rate NUMERIC(5,2) DEFAULT 80,
-          UNIQUE(dept_id, category_id)
-        )
-      `);
-      
-      // 申请表
-      await db.query(`
-        CREATE TABLE requests (
-          id SERIAL PRIMARY KEY,
-          request_no VARCHAR(30) UNIQUE NOT NULL,
-          dept_id VARCHAR(20) NOT NULL,
-          category VARCHAR(30) NOT NULL,
-          amount NUMERIC(15,2) NOT NULL,
-          purpose TEXT,
-          applicant_id INT REFERENCES users(id),
-          status VARCHAR(20) DEFAULT 'approved',
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
-      
-      // 插入用户
-      await db.query(`
-        INSERT INTO users (username, name, password, department, role) VALUES
-        ('admin', '系统管理员', '123456', 'zonghe', 'admin'),
-        ('Enzo', 'Enzo', 'ZZY1995zxakk', 'zonghe', 'admin')
-      `);
-      
-      // 插入预算数据
-      const budgets = [
-        ['zonghe','staff_pay',326.02,128.13],
-        ['zonghe','salary_total',230.98,86.26],
-        ['zonghe','welfare',0.77,7.28],
-        ['zonghe','fixed_asset_dep',8.68,0.73],
-        ['zonghe','low_value_amort',2.55,3.44],
-        ['zonghe','travel',20.95,11.42],
-        ['zonghe','office',6.73,5.05],
-        ['zonghe','rent',13.05,13.00],
-        ['zonghe','agency',18.77,7.22],
-        ['zonghe','pollution_fee',0.40,0],
-        ['zonghe','property_fee',3.17,0.72],
-        ['zonghe','vehicle_fee',1.86,1.95],
-        ['zonghe','conference',3.45,0.17],
-        ['zonghe','labor_insurance',24.52,8.28],
-        ['zonghe','other_admin',15.09,1.36],
-        ['jingying','staff_pay_s',218.36,90.10],
-        ['jingying','salary_total_s',161.80,62.04],
-        ['jingying','welfare_s',1.28,5.19],
-        ['jingying','office_s',11.22,3.27],
-        ['jingying','transport_s',11.40,0.64],
-        ['jingying','travel_s',33.08,4.93],
-        ['jingying','entertainment_s',5.00,0.19],
-        ['jingying','rent_s',69.48,45.16],
-        ['jingying','labor_insurance_s',40.86,7.21],
-        ['jingying','other_sales',8.13,1.27]
-      ];
-      
-      for (const [deptId, catId, totalWan, usedWan] of budgets) {
-        await db.query(
-          `INSERT INTO budgets (dept_id, category_id, total_amount, used_amount, warning_rate)
-           VALUES ($1, $2, $3, $4, 80)`,
-          [deptId, catId, Math.round(totalWan * 10000), Math.round(usedWan * 10000)]
-        );
-      }
-      
-      console.log('✅ 数据库初始化完成');
-    } else {
-      console.log('✅ 数据库已存在，跳过初始化');
-    }
-    
-    initialized = true;
-  } catch (err) {
-    console.error('❌ 初始化失败：', err);
-  }
-}
-
-// 手动重置接口 —— 仅你可用
+// 手动重置接口
 app.post('/api/admin/reset-db', async (req, res) => {
   try {
-    // 检查密钥
     if (req.body.secret !== 'reset-2026') {
       return res.status(403).json({ msg: '无权限' });
     }
     
+    console.log('🔄 开始重置数据库...');
+    
+    // 重建所有表
     await db.query('DROP TABLE IF EXISTS requests CASCADE');
     await db.query('DROP TABLE IF EXISTS budgets CASCADE');
     await db.query('DROP TABLE IF EXISTS users CASCADE');
     
-    initialized = false;
-    await initOnce();
+    // 用户表
+    await db.query(`
+      CREATE TABLE users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(50) UNIQUE NOT NULL,
+        name VARCHAR(50),
+        password VARCHAR(255) NOT NULL,
+        department VARCHAR(50),
+        role VARCHAR(20) DEFAULT 'user',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
     
-    res.json({ ok: true, msg: '数据库已重置！admin/123456 登录' });
+    // 插入用户 —— 明文存储方便比对调试
+    await db.query(`
+      INSERT INTO users (username, name, password, department, role) VALUES
+      ('admin', '系统管理员', '123456', 'zonghe', 'admin'),
+      ('Enzo', 'Enzo', 'ZZY1995zxakk', 'zonghe', 'admin')
+    `);
+    console.log('✅ 用户创建成功: admin/123456');
+    
+    // 预算表
+    await db.query(`
+      CREATE TABLE budgets (
+        id SERIAL PRIMARY KEY,
+        dept_id VARCHAR(20) NOT NULL,
+        category_id VARCHAR(30) NOT NULL,
+        total_amount NUMERIC(15,2) DEFAULT 0,
+        used_amount NUMERIC(15,2) DEFAULT 0,
+        warning_rate NUMERIC(5,2) DEFAULT 80,
+        UNIQUE(dept_id, category_id)
+      )
+    `);
+    
+    // 申请表
+    await db.query(`
+      CREATE TABLE requests (
+        id SERIAL PRIMARY KEY,
+        request_no VARCHAR(30) UNIQUE NOT NULL,
+        dept_id VARCHAR(20) NOT NULL,
+        category VARCHAR(30) NOT NULL,
+        amount NUMERIC(15,2) NOT NULL,
+        purpose TEXT,
+        applicant_id INT REFERENCES users(id),
+        status VARCHAR(20) DEFAULT 'approved',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    
+    // 预算数据
+    const budgets = [
+      ['zonghe','staff_pay',326.02,128.13],
+      ['zonghe','salary_total',230.98,86.26],
+      ['zonghe','welfare',0.77,7.28],
+      ['zonghe','fixed_asset_dep',8.68,0.73],
+      ['zonghe','low_value_amort',2.55,3.44],
+      ['zonghe','travel',20.95,11.42],
+      ['zonghe','office',6.73,5.05],
+      ['zonghe','rent',13.05,13.00],
+      ['zonghe','agency',18.77,7.22],
+      ['zonghe','pollution_fee',0.40,0],
+      ['zonghe','property_fee',3.17,0.72],
+      ['zonghe','vehicle_fee',1.86,1.95],
+      ['zonghe','conference',3.45,0.17],
+      ['zonghe','labor_insurance',24.52,8.28],
+      ['zonghe','other_admin',15.09,1.36],
+      ['jingying','staff_pay_s',218.36,90.10],
+      ['jingying','salary_total_s',161.80,62.04],
+      ['jingying','welfare_s',1.28,5.19],
+      ['jingying','office_s',11.22,3.27],
+      ['jingying','transport_s',11.40,0.64],
+      ['jingying','travel_s',33.08,4.93],
+      ['jingying','entertainment_s',5.00,0.19],
+      ['jingying','rent_s',69.48,45.16],
+      ['jingying','labor_insurance_s',40.86,7.21],
+      ['jingying','other_sales',8.13,1.27]
+    ];
+    
+    for (const [deptId, catId, totalWan, usedWan] of budgets) {
+      await db.query(
+        `INSERT INTO budgets (dept_id, category_id, total_amount, used_amount, warning_rate)
+         VALUES ($1, $2, $3, $4, 80)`,
+        [deptId, catId, Math.round(totalWan * 10000), Math.round(usedWan * 10000)]
+      );
+    }
+    
+    console.log('✅ 全部预算数据导入完成');
+    res.json({ ok: true, msg: '重置成功！请用 admin / 123456 登录' });
   } catch (err) {
-    res.status(500).json({ msg: '重置失败：' + err.message });
+    console.error('❌ 重置失败：', err);
+    res.status(500).json({ ok: false, msg: '重置失败: ' + err.message });
   }
 });
 
-// 登录
+// 登录接口 —— 最简化版
 app.post('/api/login', async (req, res) => {
-  await initOnce();
-  const { username, password } = req.body;
-  
   try {
-    const result = await db.query('SELECT * FROM users WHERE username = $1', [username]);
-    const u = result.rows[0];
+    const { username, password } = req.body;
+    console.log('🔐 登录请求:', username);
     
-    if (!u) return res.status(400).json({ msg: '账号不存在' });
-    if (u.password !== password) return res.status(400).json({ msg: '密码错误' });
+    const result = await db.query('SELECT * FROM users WHERE username = $1', [username]);
+    const user = result.rows[0];
+    
+    if (!user) {
+      console.log('❌ 账号不存在:', username);
+      return res.status(400).json({ msg: '账号不存在' });
+    }
+    
+    console.log('🔍 数据库密码:', user.password, '输入密码:', password);
+    
+    if (user.password !== password) {
+      console.log('❌ 密码不匹配');
+      return res.status(400).json({ msg: '密码错误' });
+    }
     
     const token = jwt.sign(
-      { id: u.id, username: u.username, name: u.name, role: u.role, dept: u.department },
+      { id: user.id, username: user.username, name: user.name, role: user.role },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
-    res.json({ token, name: u.name, role: u.role });
+    
+    console.log('✅ 登录成功:', user.name);
+    res.json({ token, name: user.name, role: user.role });
   } catch (err) {
-    console.error('登录错误：', err);
-    res.status(500).json({ msg: '系统错误，请稍后重试' });
+    console.error('❌ 登录异常:', err);
+    res.status(500).json({ msg: '系统错误: ' + err.message });
   }
 });
 
@@ -259,4 +245,4 @@ app.get('/api/export/excel', auth, async (_, res) => {
 
 app.get('/', (_, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-initOnce().then(() => app.listen(PORT, () => console.log(`🚀 运行在端口 ${PORT}`)));
+app.listen(PORT, () => console.log(`🚀 运行在端口 ${PORT}`));

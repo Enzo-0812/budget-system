@@ -32,6 +32,7 @@ function auth(req, res, next) {
 
 async function initDatabase() {
   try {
+    // 建表
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -80,16 +81,21 @@ async function initDatabase() {
       )
     `);
 
+    // 部门
     const depts = [['admin','综合管理部'],['finance','财务部'],['director','管理层']];
     for (const [id, name] of depts) {
       await db.query(`INSERT INTO dept_config VALUES ($1,$2) ON CONFLICT (dept_id) DO UPDATE SET display_name=$2`, [id, name]);
     }
+
+    // 科目
     const cats = [['office','日常办公费'],['travel','差旅交通费'],['procurement','固定资产采购'],['business','业务招待费'],['project','专项项目支出']];
     for (const [id, name] of cats) {
       await db.query(`INSERT INTO category_config VALUES ($1,$2) ON CONFLICT (cat_id) DO UPDATE SET display_name=$2`, [id, name]);
     }
 
-    // 所有用户：不存在就新增，已存在就更新密码
+    // 👇 关键：清空所有用户 → 重新生成（密码强制重置）
+    await db.query('DELETE FROM users');
+
     const users = [
       { username: 'Enzo', name: 'Enzo', password: 'ZZY1995zxakk', department: 'admin', role: 'admin' },
       { username: 'SHI', name: 'SHI', password: '123456', department: 'finance', role: 'user' },
@@ -104,24 +110,16 @@ async function initDatabase() {
     ];
 
     for (const u of users) {
-      const chk = await db.query('SELECT * FROM users WHERE username = $1', [u.username]);
       const hash = await bcrypt.hash(u.password, 10);
-      if (chk.rows.length === 0) {
-        await db.query(
-          'INSERT INTO users (username, name, password, department, role) VALUES ($1, $2, $3, $4, $5)',
-          [u.username, u.name, hash, u.department, u.role]
-        );
-      } else {
-        await db.query(
-          'UPDATE users SET password = $1, name = $2, department = $3, role = $4 WHERE username = $5',
-          [hash, u.name, u.department, u.role, u.username]
-        );
-      }
+      await db.query(
+        'INSERT INTO users (username, name, password, department, role) VALUES ($1, $2, $3, $4, $5)',
+        [u.username, u.name, hash, u.department, u.role]
+      );
     }
 
-    console.log('✅ 数据库初始化完成');
+    console.log('✅ 用户全部重建完成');
   } catch (err) {
-    console.error('❌', err);
+    console.error('❌ 初始化失败:', err);
   }
 }
 

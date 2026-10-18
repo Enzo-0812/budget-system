@@ -15,14 +15,14 @@
   <div id="loginPage" class="flex items-center justify-center min-h-screen p-4">
     <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-6">
       <h1 class="text-2xl font-bold text-center mb-6">💰 预算管控系统</h1>
-      <div class="space-y-4">
+      <form id="loginForm" class="space-y-4">
         <div><label class="block text-sm font-medium mb-1">账号</label>
           <input type="text" id="username" value="admin" class="w-full px-4 py-2 border rounded-lg" /></div>
         <div><label class="block text-sm font-medium mb-1">密码</label>
           <input type="password" id="password" value="123456" class="w-full px-4 py-2 border rounded-lg" /></div>
-        <button id="loginBtn" class="w-full bg-primary text-white py-2.5 rounded-lg hover:bg-primary/90">登录系统</button>
+        <button type="submit" class="w-full bg-primary text-white py-2.5 rounded-lg hover:bg-primary/90">登录系统</button>
         <p class="text-xs text-slate-400 text-center">默认账号：admin / 123456</p>
-      </div>
+      </form>
     </div>
   </div>
   <div id="mainPage" class="hidden">
@@ -89,73 +89,98 @@ const API = '/api';
 let token = localStorage.getItem('token');
 const deptMap = {admin:'综合管理部',sales:'市场营销部',tech:'技术研发部',ops:'运营中心'};
 const catMap = {office:'日常办公费',travel:'差旅交通费',procurement:'固定资产采购',business:'业务招待费',project:'专项项目支出'};
+
 if (token) enterMain();
-document.getElementById('loginBtn').addEventListener('click', async () => {
+
+// 修复：用form提交替代button点击，更稳定
+document.getElementById('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
   const res = await fetch(API+'/login', {
-    method:'POST', headers:{'Content-Type':'application/json'},
+    method:'POST', 
+    headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
       username:document.getElementById('username').value,
       password:document.getElementById('password').value
     })
   });
   const d = await res.json();
-  if (!res.ok) return alert(d.msg);
+  if (!res.ok) return alert(d.msg || '登录失败');
   token = d.token;
   localStorage.setItem('token', token);
   enterMain();
 });
+
 document.getElementById('logoutBtn').addEventListener('click', () => {
   localStorage.removeItem('token');
   localStorage.removeItem('username');
   location.reload();
 });
+
 async function enterMain() {
   document.getElementById('loginPage').classList.add('hidden');
   document.getElementById('mainPage').classList.remove('hidden');
-  const payload = JSON.parse(atob(token.split('.')[1]));
-  document.getElementById('userInfo').textContent = payload.name || payload.username || '用户';
-  localStorage.setItem('username', payload.name || payload.username);
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    document.getElementById('userInfo').textContent = payload.name || payload.username || '用户';
+    localStorage.setItem('username', payload.name || payload.username);
+  } catch {
+    document.getElementById('userInfo').textContent = '用户';
+  }
   loadData();
 }
+
 async function loadData() {
-  const [budRes, reqRes] = await Promise.all([
-    fetch(API+'/budgets', {headers:{Authorization:'Bearer '+token}}),
-    fetch(API+'/requests', {headers:{Authorization:'Bearer '+token}})
-  ]);
-  const budgets = await budRes.json();
-  const requests = await reqRes.json();
-  
-  const deptTotal = {};
-  budgets.forEach(b => {
-    if (!deptTotal[b.dept_id]) deptTotal[b.dept_id] = {total:0, used:0};
-    deptTotal[b.dept_id].total += +b.total_amount;
-    deptTotal[b.dept_id].used += +b.used_amount;
-  });
-  const dash = document.getElementById('dashboard');
-  dash.innerHTML = '';
-  for (const [d, v] of Object.entries(deptTotal)) {
-    const pct = (v.used/v.total*100).toFixed(1);
-    const color = pct>=90 ? 'bg-danger' : pct>=75 ? 'bg-warning' : 'bg-success';
-    dash.innerHTML += `
-      <div class="border rounded-lg p-4">
-        <h3 class="font-medium text-slate-600 mb-2">${deptMap[d]}</h3>
-        <p class="text-xl font-bold">¥${v.used.toLocaleString()} / ${v.total.toLocaleString()}</p>
-        <p class="text-xs text-slate-500">使用率: ${pct}%</p>
-        <div class="progress-bar mt-2"><div class="progress-fill ${color}" style="width:${pct}%"></div></div>
-      </div>`;
+  try {
+    const [budRes, reqRes] = await Promise.all([
+      fetch(API+'/budgets', {headers:{Authorization:'Bearer '+token}}),
+      fetch(API+'/requests', {headers:{Authorization:'Bearer '+token}})
+    ]);
+    
+    if (!budRes.ok || !reqRes.ok) {
+      console.warn('接口数据获取失败');
+      return;
+    }
+    
+    const budgets = await budRes.json();
+    const requests = await reqRes.json();
+    
+    const deptTotal = {};
+    budgets.forEach(b => {
+      if (!deptTotal[b.dept_id]) deptTotal[b.dept_id] = {total:0, used:0};
+      deptTotal[b.dept_id].total += +b.total_amount;
+      deptTotal[b.dept_id].used += +b.used_amount;
+    });
+    
+    const dash = document.getElementById('dashboard');
+    dash.innerHTML = '';
+    for (const [d, v] of Object.entries(deptTotal)) {
+      const pct = (v.used/v.total*100).toFixed(1);
+      const color = pct>=90 ? 'bg-danger' : pct>=75 ? 'bg-warning' : 'bg-success';
+      dash.innerHTML += `
+        <div class="border rounded-lg p-4">
+          <h3 class="font-medium text-slate-600 mb-2">${deptMap[d] || d}</h3>
+          <p class="text-xl font-bold">¥${v.used.toLocaleString()} / ${v.total.toLocaleString()}</p>
+          <p class="text-xs text-slate-500">使用率: ${pct}%</p>
+          <div class="progress-bar mt-2"><div class="progress-fill ${color}" style="width:${pct}%"></div></div>
+        </div>`;
+    }
+    
+    const rec = document.getElementById('records');
+    rec.innerHTML = requests.length ? requests.map(r => `
+      <tr class="border-t"><td class="p-3">${r.request_no}</td><td class="p-3">${deptMap[r.dept_id] || r.dept_id}</td>
+      <td class="p-3">${catMap[r.category] || r.category}</td><td class="p-3">¥${(+r.amount).toFixed(2)}</td>
+      <td class="p-3"><span class="px-2 py-1 rounded text-xs bg-green-100 text-green-700">已通过</span></td></tr>
+    `).join('') : '<tr><td colspan="5" class="p-3 text-center text-slate-400">暂无记录</td></tr>';
+  } catch (err) {
+    console.error('加载数据失败:', err);
   }
-  
-  const rec = document.getElementById('records');
-  rec.innerHTML = requests.length ? requests.map(r => `
-    <tr class="border-t"><td class="p-3">${r.request_no}</td><td class="p-3">${deptMap[r.dept_id]}</td>
-    <td class="p-3">${catMap[r.category]}</td><td class="p-3">¥${(+r.amount).toFixed(2)}</td>
-    <td class="p-3"><span class="px-2 py-1 rounded text-xs bg-green-100 text-green-700">已通过</span></td></tr>
-  `).join('') : '<tr><td colspan="5" class="p-3 text-center text-slate-400">暂无记录</td></tr>';
 }
+
 document.getElementById('form').addEventListener('submit', async e => {
   e.preventDefault();
   const res = await fetch(API+'/requests', {
-    method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+    method:'POST', 
+    headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
     body:JSON.stringify({
       dept:document.getElementById('dept').value,
       category:document.getElementById('cat').value,
@@ -168,10 +193,10 @@ document.getElementById('form').addEventListener('submit', async e => {
   box.classList.remove('hidden');
   if (d.ok) {
     box.className = 'mt-4 p-3 rounded-lg bg-green-50 text-green-700 border border-green-100';
-    box.textContent = `✅ 通过！申请单号：${d.no}，剩余额度¥${d.remain.toFixed(2)}`;
+    box.textContent = `✅ 通过！申请单号：${d.no}，剩余额度¥${(d.remain || 0).toFixed(2)}`;
   } else {
     box.className = 'mt-4 p-3 rounded-lg bg-red-50 text-red-700 border border-red-100';
-    box.textContent = `❌ ${d.msg}`;
+    box.textContent = `❌ ${d.msg || '提交失败'}`;
   }
   loadData();
   e.target.reset();
@@ -185,7 +210,7 @@ async function openChangePwd() {
   if (!newPwd) return;
   const confirmPwd = prompt('请再次输入新密码：');
   if (!confirmPwd) return;
-
+  
   const res = await fetch('/user/password', {
     method: 'POST',
     headers: {
@@ -194,9 +219,9 @@ async function openChangePwd() {
     },
     body: JSON.stringify({ oldPwd, newPwd, confirmPwd })
   });
-
+  
   const data = await res.json();
-  alert(data.msg);
+  alert(data.msg || data.message);
   if (data.success) {
     localStorage.removeItem('token');
     localStorage.removeItem('username');

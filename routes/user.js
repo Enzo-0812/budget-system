@@ -1,42 +1,42 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { query } = require('../db');
-const { setDataScope } = require('../middleware/auth');
+const jwt = require('jsonwebtoken');
+const { Pool } = require('pg');
 const router = express.Router();
 
-// 修改密码页面
-router.get('/password', setDataScope, (req, res) => {
-  res.render('user/password', { user: req.user });
+const SECRET = process.env.JWT_SECRET || 'budget-secret-2026';
+const db = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
 });
 
-// 提交修改密码
-router.post('/password', setDataScope, async (req, res) => {
+const getCurrentUser = async (req) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return null;
+  try {
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, SECRET);
+    const res = await db.query('SELECT * FROM users WHERE username = $1', [decoded.username]);
+    return res.rows[0];
+  } catch {
+    return null;
+  }
+};
+
+router.post('/password', async (req, res) => {
+  const user = await getCurrentUser(req);
+  if (!user) return res.status(401).json({ msg: '请先登录' });
+
   const { oldPwd, newPwd, confirmPwd } = req.body;
-  const user = req.user;
 
-  // 验证原密码
   const isCorrect = await bcrypt.compare(oldPwd, user.password);
-  if (!isCorrect) {
-    return res.render('user/password', { err: '原密码输入错误', user });
-  }
+  if (!isCorrect) return res.json({ success: false, msg: '原密码输入错误' });
+  if (newPwd !== confirmPwd) return res.json({ success: false, msg: '两次新密码不一致' });
+  if (newPwd.length < 6) return res.json({ success: false, msg: '新密码至少6位' });
 
-  // 确认两次新密码一致
-  if (newPwd !== confirmPwd) {
-    return res.render('user/password', { err: '两次输入的新密码不一致', user });
-  }
-
-  // 密码长度校验
-  if (newPwd.length < 6) {
-    return res.render('user/password', { err: '新密码至少6位', user });
-  }
-
-  // 加密并保存新密码
   const newHash = await bcrypt.hash(newPwd, 10);
-  await query('UPDATE users SET password = $1 WHERE id = $2', [newHash, user.id]);
-
-  // 成功跳转
-  req.flash('success', '密码修改成功！请用新密码重新登录');
-  res.redirect('/');
+  await db.query('UPDATE users SET password = $1 WHERE id = $2', [newHash, user.id]);
+  res.json({ success: true, msg: '密码修改成功！请重新登录' });
 });
 
 module.exports = router;

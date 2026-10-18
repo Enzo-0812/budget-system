@@ -16,13 +16,7 @@ app.use('/user', userRouter);
 const SECRET = process.env.JWT_SECRET || 'budget-secret-2026';
 
 const db = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-    checkServerIdentity: (host, cert) => {
-      return undefined;
-    }
-  }
+  connectionString: process.env.DATABASE_URL
 });
 
 async function initDB() {

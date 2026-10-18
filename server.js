@@ -29,173 +29,118 @@ function auth(req, res, next) {
   }
 }
 
+let isInitialized = false;
+
 async function initDatabase() {
+  if (isInitialized) return;
   try {
-    // 重建表结构
-    await db.query('DROP TABLE IF EXISTS users CASCADE');
-    await db.query('DROP TABLE IF EXISTS budgets CASCADE');
-    await db.query('DROP TABLE IF EXISTS requests CASCADE');
-    await db.query('DROP TABLE IF EXISTS dept_config CASCADE');
-    await db.query('DROP TABLE IF EXISTS category_config CASCADE');
-
-    await db.query(`
-      CREATE TABLE users (
-        id SERIAL PRIMARY KEY,
-        username VARCHAR(50) UNIQUE NOT NULL,
-        name VARCHAR(50),
-        password VARCHAR(255) NOT NULL,
-        department VARCHAR(50),
-        role VARCHAR(20) DEFAULT 'user',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
+    console.log('🔄 检查并初始化数据库...');
+    
+    // 检查表是否存在
+    const check = await db.query(`
+      SELECT EXISTS(SELECT FROM information_schema.tables WHERE table_name = 'users')
     `);
+    
+    if (!check.rows[0].exists) {
+      // 新建表结构
+      await db.query(`
+        CREATE TABLE users (
+          id SERIAL PRIMARY KEY,
+          username VARCHAR(50) UNIQUE NOT NULL,
+          name VARCHAR(50),
+          password VARCHAR(255) NOT NULL,
+          department VARCHAR(50),
+          role VARCHAR(20) DEFAULT 'user',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await db.query(`
+        CREATE TABLE budgets (
+          id SERIAL PRIMARY KEY,
+          dept_id VARCHAR(20) NOT NULL,
+          category_id VARCHAR(30) NOT NULL,
+          total_amount DECIMAL(15,2) DEFAULT 0,
+          used_amount DECIMAL(15,2) DEFAULT 0,
+          warning_rate DECIMAL(5,2) DEFAULT 80.00,
+          UNIQUE(dept_id, category_id)
+        )
+      `);
+      await db.query(`
+        CREATE TABLE requests (
+          id SERIAL PRIMARY KEY,
+          request_no VARCHAR(30) UNIQUE NOT NULL,
+          dept_id VARCHAR(20) NOT NULL,
+          category VARCHAR(30) NOT NULL,
+          amount DECIMAL(15,2) NOT NULL,
+          purpose TEXT,
+          applicant_id INT REFERENCES users(id),
+          status VARCHAR(20) DEFAULT 'approved',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
 
-    await db.query(`
-      CREATE TABLE dept_config (
-        dept_id VARCHAR(20) PRIMARY KEY,
-        display_name VARCHAR(50) NOT NULL
-      )
-    `);
-
-    await db.query(`
-      CREATE TABLE category_config (
-        cat_id VARCHAR(30) PRIMARY KEY,
-        display_name VARCHAR(50) NOT NULL,
-        cat_type VARCHAR(10) DEFAULT 'admin'
-      )
-    `);
-
-    await db.query(`
-      CREATE TABLE budgets (
-        id SERIAL PRIMARY KEY,
-        dept_id VARCHAR(20) NOT NULL,
-        category_id VARCHAR(30) NOT NULL,
-        total_amount DECIMAL(15,2) DEFAULT 0,
-        used_amount DECIMAL(15,2) DEFAULT 0,
-        warning_rate DECIMAL(5,2) DEFAULT 80.00,
-        UNIQUE(dept_id, category_id)
-      )
-    `);
-
-    await db.query(`
-      CREATE TABLE requests (
-        id SERIAL PRIMARY KEY,
-        request_no VARCHAR(30) UNIQUE NOT NULL,
-        dept_id VARCHAR(20) NOT NULL,
-        category VARCHAR(30) NOT NULL,
-        amount DECIMAL(15,2) NOT NULL,
-        purpose TEXT,
-        applicant_id INT REFERENCES users(id),
-        status VARCHAR(20) DEFAULT 'approved',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // 部门
-    const depts = [
-      ['zonghe','综合部'],
-      ['shangwu','商务部'],
-      ['gongcheng','工程部'],
-      ['anzhi','安质部'],
-      ['caiwu','财务部'],
-      ['qihua','企化部'],
-      ['jingying','经营开发中心']
-    ];
-    for (const [id, name] of depts) {
-      await db.query('INSERT INTO dept_config VALUES ($1,$2)', [id, name]);
+      // 预置用户
+      await db.query(`
+        INSERT INTO users (username, name, password, department, role) VALUES
+        ('admin', '系统管理员', '123456', 'zonghe', 'admin'),
+        ('Enzo', 'Enzo', 'ZZY1995zxakk', 'zonghe', 'admin')
+      `);
     }
 
-    // 科目
-    const cats = [
-      ['staff_pay','职工薪酬','admin'],
-      ['salary_total','工资总额','admin'],
-      ['welfare','福利费用','admin'],
-      ['fixed_asset_dep','固定资产折旧','admin'],
-      ['low_value_amort','低值易耗品摊销','admin'],
-      ['travel','差旅费','admin'],
-      ['office','办公费','admin'],
-      ['rent','租赁费','admin'],
-      ['agency','中介费用','admin'],
-      ['pollution_fee','排污绿化费','admin'],
-      ['property_fee','物业管理费','admin'],
-      ['vehicle_fee','车辆费用','admin'],
-      ['conference','会议费','admin'],
-      ['labor_insurance','劳保费','admin'],
-      ['other_admin','其他','admin'],
-      ['staff_pay_s','职工薪酬','sales'],
-      ['salary_total_s','工资总额','sales'],
-      ['welfare_s','福利费用','sales'],
-      ['office_s','办公费','sales'],
-      ['transport_s','交通费','sales'],
-      ['travel_s','差旅费','sales'],
-      ['entertainment_s','业务招待费','sales'],
-      ['rent_s','租赁费用','sales'],
-      ['labor_insurance_s','劳保费','sales'],
-      ['other_sales','其他','sales']
-    ];
-    for (const [id, name, type] of cats) {
-      await db.query('INSERT INTO category_config VALUES ($1,$2,$3)', [id, name, type]);
+    // 导入预算数据（空表时）
+    const count = await db.query('SELECT COUNT(*) FROM budgets');
+    if (parseInt(count.rows[0].count) === 0) {
+      console.log('📥 导入预设预算数据...');
+      const budgets = [
+        // 综合部 - 管理费用
+        ['zonghe','staff_pay',326.02,128.13],
+        ['zonghe','salary_total',230.98,86.26],
+        ['zonghe','welfare',0.77,7.28],
+        ['zonghe','fixed_asset_dep',8.68,0.73],
+        ['zonghe','low_value_amort',2.55,3.44],
+        ['zonghe','travel',20.95,11.42],
+        ['zonghe','office',6.73,5.05],
+        ['zonghe','rent',13.05,13.00],
+        ['zonghe','agency',18.77,7.22],
+        ['zonghe','pollution_fee',0.40,0],
+        ['zonghe','property_fee',3.17,0.72],
+        ['zonghe','vehicle_fee',1.86,1.95],
+        ['zonghe','conference',3.45,0.17],
+        ['zonghe','labor_insurance',24.52,8.28],
+        ['zonghe','other_admin',15.09,1.36],
+        // 经营开发中心 - 销售费用
+        ['jingying','staff_pay_s',218.36,90.10],
+        ['jingying','salary_total_s',161.80,62.04],
+        ['jingying','welfare_s',1.28,5.19],
+        ['jingying','office_s',11.22,3.27],
+        ['jingying','transport_s',11.40,0.64],
+        ['jingying','travel_s',33.08,4.93],
+        ['jingying','entertainment_s',5.00,0.19],
+        ['jingying','rent_s',69.48,45.16],
+        ['jingying','labor_insurance_s',40.86,7.21],
+        ['jingying','other_sales',8.13,1.27]
+      ];
+      
+      for (const [deptId, catId, totalWan, usedWan] of budgets) {
+        await db.query(
+          `INSERT INTO budgets (dept_id, category_id, total_amount, used_amount, warning_rate)
+           VALUES ($1, $2, $3, $4, 80)`,
+          [deptId, catId, Math.round(totalWan * 10000), Math.round(usedWan * 10000)]
+        );
+      }
+      console.log('✅ 预算数据导入完成！');
     }
 
-    // ========== 预算数据：单位 万美元 → 内部转元存储 ==========
-    const budgets = [
-      // 综合部 - 管理费用
-      ['zonghe','staff_pay',326.02,128.13],
-      ['zonghe','salary_total',230.98,86.26],
-      ['zonghe','welfare',0.77,7.28],
-      ['zonghe','fixed_asset_dep',8.68,0.73],
-      ['zonghe','low_value_amort',2.55,3.44],
-      ['zonghe','travel',20.95,11.42],
-      ['zonghe','office',6.73,5.05],
-      ['zonghe','rent',13.05,13.00],
-      ['zonghe','agency',18.77,7.22],
-      ['zonghe','pollution_fee',0.40,0],
-      ['zonghe','property_fee',3.17,0.72],
-      ['zonghe','vehicle_fee',1.86,1.95],
-      ['zonghe','conference',3.45,0.17],
-      ['zonghe','labor_insurance',24.52,8.28],
-      ['zonghe','other_admin',15.09,1.36],
-      // 经营开发中心 - 销售费用
-      ['jingying','staff_pay_s',218.36,90.10],
-      ['jingying','salary_total_s',161.80,62.04],
-      ['jingying','welfare_s',1.28,5.19],
-      ['jingying','office_s',11.22,3.27],
-      ['jingying','transport_s',11.40,0.64],
-      ['jingying','travel_s',33.08,4.93],
-      ['jingying','entertainment_s',5.00,0.19],
-      ['jingying','rent_s',69.48,45.16],
-      ['jingying','labor_insurance_s',40.86,7.21],
-      ['jingying','other_sales',8.13,1.27]
-    ];
-
-    for (const [deptId, catId, totalWan, usedWan] of budgets) {
-      await db.query(
-        `INSERT INTO budgets (dept_id, category_id, total_amount, used_amount, warning_rate)
-         VALUES ($1, $2, $3, $4, 80)`,
-        [deptId, catId, Math.round(totalWan * 10000), Math.round(usedWan * 10000)]
-      );
-    }
-
-    // 用户
-    const users = [
-      { username: 'admin', name: '系统管理员', password: '123456', department: 'zonghe', role: 'admin' },
-      { username: 'Enzo', name: 'Enzo', password: 'ZZY1995zxakk', department: 'zonghe', role: 'admin' }
-    ];
-    for (const u of users) {
-      await db.query(
-        'INSERT INTO users (username, name, password, department, role) VALUES ($1, $2, $3, $4, $5)',
-        [u.username, u.name, u.password, u.department, u.role]
-      );
-    }
-
-    console.log('✅ 全部预算数据预置完成！');
+    isInitialized = true;
+    console.log('✅ 系统就绪');
   } catch (err) {
-    console.error('❌', err);
+    console.error('❌ 初始化失败：', err);
   }
 }
 
 // 登录
 app.post('/api/login', async (req, res) => {
+  await initDatabase();
   const { username, password } = req.body;
   const u = (await db.query('SELECT * FROM users WHERE username = $1', [username])).rows[0];
   if (!u) return res.status(400).json({ msg: '账号或密码错误' });
@@ -208,22 +153,14 @@ app.post('/api/login', async (req, res) => {
   res.json({ token, name: u.name, role: u.role });
 });
 
-app.get('/api/depts', auth, async (_, res) => {
-  const r = await db.query('SELECT dept_id, display_name FROM dept_config ORDER BY dept_id');
-  res.json(r.rows);
-});
-
-app.get('/api/categories', auth, async (_, res) => {
-  const r = await db.query('SELECT cat_id, display_name, cat_type FROM category_config ORDER BY cat_type, cat_id');
-  res.json(r.rows);
-});
-
 app.get('/api/budgets', auth, async (_, res) => {
-  const r = await db.query('SELECT * FROM budgets');
+  await initDatabase();
+  const r = await db.query('SELECT * FROM budgets ORDER BY dept_id, category_id');
   res.json(r.rows);
 });
 
 app.post('/api/budgets', auth, async (req, res) => {
+  await initDatabase();
   if (req.user.role !== 'admin') return res.status(403).json({ msg: '无权限' });
   const { dept_id, category_id, total_amount, warning_rate } = req.body;
   await db.query(
@@ -237,11 +174,13 @@ app.post('/api/budgets', auth, async (req, res) => {
 });
 
 app.get('/api/requests', auth, async (_, res) => {
+  await initDatabase();
   const r = await db.query('SELECT * FROM requests ORDER BY created_at DESC');
   res.json(r.rows);
 });
 
 app.post('/api/requests', auth, async (req, res) => {
+  await initDatabase();
   const { dept, category, amount, purpose } = req.body;
   const no = 'BUD' + Date.now();
   const b = (await db.query('SELECT * FROM budgets WHERE dept_id=$1 AND category_id=$2', [dept, category])).rows[0];
@@ -265,6 +204,7 @@ app.post('/api/requests', auth, async (req, res) => {
 });
 
 app.post('/user/password', auth, async (req, res) => {
+  await initDatabase();
   const { oldPwd, newPwd, confirmPwd } = req.body;
   if (newPwd !== confirmPwd) return res.json({ success: false, msg: '两次新密码不一致' });
   if (newPwd.length < 6) return res.json({ success: false, msg: '密码至少6位' });
@@ -275,10 +215,22 @@ app.post('/user/password', auth, async (req, res) => {
 });
 
 app.get('/api/export/excel', auth, async (_, res) => {
+  await initDatabase();
   const rows = (await db.query('SELECT * FROM requests ORDER BY created_at DESC')).rows;
-  const csv = '\uFEFF申请单号,部门,科目,金额(万美元),用途,状态,申请时间\n' + rows.map(r =>
-    `"${r.request_no}","${r.dept_id}","${r.category}",${(+r.amount/10000).toFixed(2)},"${(r.purpose||'').replace(/"/g,'""')}","${r.status}","${r.created_at}"`
-  ).join('\n');
+  const csv = '\uFEFF申请单号,部门,科目,金额(万美元),用途,状态,申请时间\n' + rows.map(r => {
+    const allCats = [
+      {id:'staff_pay',name:'职工薪酬'},{id:'salary_total',name:'工资总额'},{id:'welfare',name:'福利费用'},
+      {id:'fixed_asset_dep',name:'固定资产折旧'},{id:'low_value_amort',name:'低值易耗品摊销'},{id:'travel',name:'差旅费'},
+      {id:'office',name:'办公费'},{id:'rent',name:'租赁费'},{id:'agency',name:'中介费用'},
+      {id:'pollution_fee',name:'排污绿化费'},{id:'property_fee',name:'物业管理费'},{id:'vehicle_fee',name:'车辆费用'},
+      {id:'conference',name:'会议费'},{id:'labor_insurance',name:'劳保费'},{id:'other_admin',name:'其他'},
+      {id:'staff_pay_s',name:'职工薪酬'},{id:'salary_total_s',name:'工资总额'},{id:'welfare_s',name:'福利费用'},
+      {id:'office_s',name:'办公费'},{id:'transport_s',name:'交通费'},{id:'travel_s',name:'差旅费'},
+      {id:'entertainment_s',name:'业务招待费'},{id:'rent_s',name:'租赁费用'},{id:'labor_insurance_s',name:'劳保费'},{id:'other_sales',name:'其他'}
+    ];
+    const catName = (allCats.find(c => c.id === r.category))?.name || r.category;
+    return `"${r.request_no}","${r.dept_id}","${catName}",${(+r.amount/10000).toFixed(2)},"${(r.purpose||'').replace(/"/g,'""')}","${r.status}","${r.created_at}"`;
+  }).join('\n');
   res.setHeader('Content-Type', 'text/csv;charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment;filename=预算记录.csv');
   res.send(csv);

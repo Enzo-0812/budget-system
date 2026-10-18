@@ -3,263 +3,305 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>多人协作预算管控系统</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet" />
-  <script>
-    tailwind.config={theme:{extend:{colors:{primary:'#2563eb',success:'#16a34a',warning:'#f59e0b',danger:'#dc2626'}}}}};
-  </script>
+  <title>预算管控系统</title>
   <style>
-    .progress-bar{height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden}
-    .progress-fill{height:100%}
-    .login-btn{
-      display:block !important;
-      visibility:visible !important;
-      width:100% !important;
-      padding:12px !important;
-      background-color:#2563eb !important;
-      color:#ffffff !important;
-      border:none !important;
-      border-radius:8px !important;
-      font-size:16px !important;
-      cursor:pointer !important;
-      margin-top:20px !important;
-    }
-    .login-btn:hover{background-color:#1d4ed8 !important;}
+    *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+    body{background:#f0f4f8;min-height:100vh}
+    .center-page{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+    .card{background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.08);width:100%;max-width:420px;padding:30px}
+    h1{text-align:center;font-size:22px;color:#1e293b;margin-bottom:25px}
+    .form-item{margin-bottom:18px}
+    label{display:block;font-size:14px;color:#475569;margin-bottom:6px}
+    input,select,textarea{width:100%;padding:12px 14px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px}
+    .btn{width:100%;padding:13px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;margin-top:8px}
+    .btn:hover{background:#1d4ed8}
+    .tip{text-align:center;font-size:12px;color:#94a3b8;margin-top:16px}
+    .hidden{display:none !important}
+    header{background:#fff;padding:15px 20px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+    .container{max-width:1200px;margin:20px auto;padding:0 20px}
+    .section{background:#fff;border-radius:10px;padding:22px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+    h2{font-size:18px;margin-bottom:18px;color:#334155}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+    .row-full{grid-column:1/-1}
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{padding:10px;text-align:left;border-bottom:1px solid #eee;font-size:14px}
+    th{background:#f8fafc}
+    .btn-sm{padding:6px 12px;background:#f1f5f9;border:none;border-radius:4px;cursor:pointer;margin-left:6px}
+    .btn-danger{background:#fee2e2;color:#b91c1c}
+    .msg{padding:12px;border-radius:6px;margin-top:15px;display:none}
+    .msg.success{background:#f0fdf4;color:#166534;display:block}
+    .msg.error{background:#fef2f2;color:#991b1b;display:block}
+    .warn{background:#fffbeb;color:#b45309;padding:10px;border-radius:6px;margin-top:10px}
+    .dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+    .dash-card{border:1px solid #e2e8f0;border-radius:8px;padding:16px}
+    .bar{height:8px;background:#e2e8f0;border-radius:4px;margin-top:8px;overflow:hidden}
+    .bar-fill{height:100%}
+    .bar-green{background:#16a34a}
+    .bar-yellow{background:#f59e0b}
+    .bar-red{background:#dc2626}
+    .tabs{display:flex;gap:10px;margin-bottom:20px}
+    .tab{padding:8px 16px;background:#f1f5f9;border-radius:6px;cursor:pointer;border:none}
+    .tab.active{background:#2563eb;color:#fff}
   </style>
 </head>
-<body class="bg-slate-50 min-h-screen">
-  <div id="loginPage" class="flex items-center justify-center min-h-screen p-4">
-    <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-6">
-      <h1 class="text-2xl font-bold text-center mb-6">💰 预算管控系统</h1>
-      <form id="loginForm" class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium mb-1">账号</label>
-          <input type="text" id="username" value="admin" class="w-full px-4 py-2 border rounded-lg" />
+<body>
+  <div id="loginPage" class="center-page">
+    <div class="card">
+      <h1>💰 预算管控系统</h1>
+      <form id="loginForm">
+        <div class="form-item">
+          <label>账号</label>
+          <input type="text" id="username" value="admin" />
         </div>
-        <div>
-          <label class="block text-sm font-medium mb-1">密码</label>
-          <input type="password" id="password" value="123456" class="w-full px-4 py-2 border rounded-lg" />
+        <div class="form-item">
+          <label>密码</label>
+          <input type="password" id="password" value="123456" />
         </div>
-        <button type="submit" class="login-btn">登录系统</button>
-        <p class="text-xs text-slate-400 text-center mt-4">默认账号：admin / 123456</p>
+        <button type="submit" class="btn">登录系统</button>
+        <p class="tip">默认账号：admin / 123456</p>
       </form>
     </div>
   </div>
+
   <div id="mainPage" class="hidden">
-    <header class="bg-white shadow px-4 py-3 flex justify-between items-center">
-      <h1 class="font-bold text-lg">💰 预算管控系统</h1>
-      <div class="flex items-center gap-3">
-        <span id="userInfo" class="text-sm mr-2"></span>
-        <button onclick="openChangePwd()" class="text-sm text-primary hover:text-primary/80 mr-2">
-          <i class="fa fa-key"></i> 修改密码
-        </button>
-        <button id="logoutBtn" class="text-sm text-slate-500 hover:text-red-500">
-          <i class="fa fa-sign-out"></i> 退出
-        </button>
+    <header>
+      <h1>💰 预算管控系统</h1>
+      <div>
+        <span id="userInfo"></span>
+        <button onclick="openChangePwd()" class="btn-sm">修改密码</button>
+        <button onclick="exportExcel()" class="btn-sm">导出Excel</button>
+        <button onclick="logout()" class="btn-sm">退出</button>
       </div>
     </header>
-    <main class="max-w-7xl mx-auto p-4 space-y-6">
-      <section class="bg-white rounded-xl shadow-sm p-5">
-        <h2 class="text-lg font-semibold mb-4">📊 预算总览</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="dashboard"></div>
-      </section>
-      <section class="bg-white rounded-xl shadow-sm p-5">
-        <h2 class="text-lg font-semibold mb-4">✍️ 提交申请</h2>
-        <form id="form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium mb-1">所属部门</label>
-            <select id="dept" class="w-full px-3 py-2 border rounded-lg" required>
-              <option value="admin">综合管理部</option>
-              <option value="sales">市场营销部</option>
-              <option value="tech">技术研发部</option>
-              <option value="ops">运营中心</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">预算科目</label>
-            <select id="cat" class="w-full px-3 py-2 border rounded-lg" required>
-              <option value="office">日常办公费</option>
-              <option value="travel">差旅交通费</option>
-              <option value="procurement">固定资产采购</option>
-              <option value="business">业务招待费</option>
-              <option value="project">专项项目支出</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">申请金额(元)</label>
-            <input type="number" id="amount" step="0.01" min="0.01" class="w-full px-3 py-2 border rounded-lg" required />
-          </div>
-          <div class="md:col-span-2">
-            <label class="block text-sm font-medium mb-1">用途说明</label>
-            <textarea id="purpose" rows="3" class="w-full px-3 py-2 border rounded-lg" required></textarea>
-          </div>
-          <div class="md:col-span-2">
-            <button type="submit" class="bg-primary text-white px-5 py-2.5 rounded-lg hover:bg-primary/90">提交并核验预算</button>
-          </div>
-        </form>
-        <div id="msg" class="mt-4 p-3 rounded-lg hidden"></div>
-      </section>
-      <section class="bg-white rounded-xl shadow-sm p-5">
-        <h2 class="text-lg font-semibold mb-4">📋 申请记录（全员共享）</h2>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="p-3 text-left">申请单号</th>
-                <th class="p-3 text-left">部门</th>
-                <th class="p-3 text-left">科目</th>
-                <th class="p-3 text-left">金额(元)</th>
-                <th class="p-3 text-left">状态</th>
-              </tr>
-            </thead>
-            <tbody id="records"></tbody>
-          </table>
+    <div class="container">
+      <div class="tabs">
+        <button class="tab active" data-view="apply">预算申请</button>
+        <button class="tab" data-view="dept">部门管理</button>
+        <button class="tab" data-view="cat">科目管理</button>
+        <button class="tab" data-view="budget">预算设置</button>
+      </div>
+
+      <div id="v-apply">
+        <div class="section">
+          <h2>📊 预算总览</h2>
+          <div id="dashboard" class="dash-grid"></div>
         </div>
-      </section>
-    </main>
+        <div class="section">
+          <h2>✍️ 提交申请</h2>
+          <form id="applyForm">
+            <div class="row">
+              <div class="form-item">
+                <label>所属部门</label>
+                <select id="deptSel" required></select>
+              </div>
+              <div class="form-item">
+                <label>预算科目</label>
+                <select id="catSel" required></select>
+              </div>
+            </div>
+            <div class="row">
+              <div class="form-item">
+                <label>申请金额(元)</label>
+                <input type="number" id="amount" step="0.01" min="0.01" required />
+              </div>
+            </div>
+            <div class="form-item row-full">
+              <label>用途说明</label>
+              <textarea id="purpose" rows="3" required></textarea>
+            </div>
+            <button type="submit" class="btn">提交申请</button>
+            <div id="applyMsg" class="msg"></div>
+          </form>
+        </div>
+        <div class="section">
+          <h2>📋 申请记录</h2>
+          <table><thead><tr><th>申请单号</th><th>部门</th><th>科目</th><th>金额</th><th>状态</th><th>时间</th></tr></thead><tbody id="records"></tbody></table>
+        </div>
+      </div>
+
+      <div id="v-dept" class="hidden">
+        <div class="section">
+          <h2>🏢 部门管理</h2>
+          <form id="deptForm" class="row">
+            <div class="form-item"><label>部门ID</label><input type="text" id="deptId" required /></div>
+            <div class="form-item"><label>部门名称</label><input type="text" id="deptName" required /></div>
+            <div class="row-full"><button type="submit" class="btn" style="width:auto">保存部门</button></div>
+          </form>
+          <table><thead><tr><th>ID</th><th>名称</th><th>操作</th></tr></thead><tbody id="deptList"></tbody></table>
+        </div>
+      </div>
+
+      <div id="v-cat" class="hidden">
+        <div class="section">
+          <h2>📑 科目管理</h2>
+          <form id="catForm" class="row">
+            <div class="form-item"><label>科目ID</label><input type="text" id="catId" required /></div>
+            <div class="form-item"><label>科目名称</label><input type="text" id="catName" required /></div>
+            <div class="row-full"><button type="submit" class="btn" style="width:auto">保存科目</button></div>
+          </form>
+          <table><thead><tr><th>ID</th><th>名称</th><th>操作</th></tr></thead><tbody id="catList"></tbody></table>
+        </div>
+      </div>
+
+      <div id="v-budget" class="hidden">
+        <div class="section">
+          <h2>💰 预算设置</h2>
+          <form id="budgetForm" class="row">
+            <div class="form-item"><label>部门</label><select id="bd" required></select></div>
+            <div class="form-item"><label>科目</label><select id="bc" required></select></div>
+            <div class="form-item"><label>总额(元)</label><input type="number" id="bt" step="0.01" required /></div>
+            <div class="form-item"><label>预警线(%)</label><input type="number" id="bw" value="80" required /></div>
+            <div class="row-full"><button type="submit" class="btn" style="width:auto">保存预算</button></div>
+          </form>
+        </div>
+      </div>
+    </div>
   </div>
+
 <script>
 const API = '/api';
 let token = localStorage.getItem('token');
-const deptMap = {admin:'综合管理部',sales:'市场营销部',tech:'技术研发部',ops:'运营中心'};
-const catMap = {office:'日常办公费',travel:'差旅交通费',procurement:'固定资产采购',business:'业务招待费',project:'专项项目支出'};
+let user = null;
+let deptMap = {}, catMap = {};
 
 if (token) enterMain();
 
 document.getElementById('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
   const res = await fetch(API+'/login', {
-    method:'POST', 
-    headers:{'Content-Type':'application/json'},
+    method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
       username:document.getElementById('username').value,
       password:document.getElementById('password').value
     })
   });
   const d = await res.json();
-  if (!res.ok) return alert(d.msg || '登录失败');
-  token = d.token;
-  localStorage.setItem('token', token);
+  if (!res.ok) return alert(d.msg);
+  token = d.token; localStorage.setItem('token',token);
+  try { user = JSON.parse(atob(token.split('.')[1])); }catch{}
   enterMain();
 });
 
-document.getElementById('logoutBtn').addEventListener('click', () => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('username');
-  location.reload();
-});
+function logout() { localStorage.clear(); location.reload(); }
 
 async function enterMain() {
   document.getElementById('loginPage').classList.add('hidden');
   document.getElementById('mainPage').classList.remove('hidden');
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    document.getElementById('userInfo').textContent = payload.name || payload.username || '用户';
-    localStorage.setItem('username', payload.name || payload.username);
-  } catch {
-    document.getElementById('userInfo').textContent = '用户';
-  }
-  loadData();
+  document.getElementById('userInfo').textContent = user?.name || user?.username || '用户';
+  await loadAll();
 }
 
-async function loadData() {
-  try {
-    const [budRes, reqRes] = await Promise.all([
-      fetch(API+'/budgets', {headers:{Authorization:'Bearer '+token}}),
-      fetch(API+'/requests', {headers:{Authorization:'Bearer '+token}})
-    ]);
-    if (!budRes.ok || !reqRes.ok) return;
-    const budgets = await budRes.json();
-    const requests = await reqRes.json();
-    
-    const deptTotal = {};
-    budgets.forEach(b => {
-      if (!deptTotal[b.dept_id]) deptTotal[b.dept_id] = {total:0, used:0};
-      deptTotal[b.dept_id].total += +b.total_amount;
-      deptTotal[b.dept_id].used += +b.used_amount;
-    });
-    
-    const dash = document.getElementById('dashboard');
-    dash.innerHTML = '';
-    for (const [d, v] of Object.entries(deptTotal)) {
-      const pct = (v.used/v.total*100).toFixed(1);
-      const color = pct>=90 ? 'bg-danger' : pct>=75 ? 'bg-warning' : 'bg-success';
-      dash.innerHTML += `
-        <div class="border rounded-lg p-4">
-          <h3 class="font-medium text-slate-600 mb-2">${deptMap[d] || d}</h3>
-          <p class="text-xl font-bold">¥${v.used.toLocaleString()} / ${v.total.toLocaleString()}</p>
-          <p class="text-xs text-slate-500">使用率: ${pct}%</p>
-          <div class="progress-bar mt-2"><div class="progress-fill ${color}" style="width:${pct}%"></div></div>
-        </div>`;
-    }
-    
-    const rec = document.getElementById('records');
-    rec.innerHTML = requests.length ? requests.map(r => `
-      <tr class="border-t">
-        <td class="p-3">${r.request_no}</td>
-        <td class="p-3">${deptMap[r.dept_id] || r.dept_id}</td>
-        <td class="p-3">${catMap[r.category] || r.category}</td>
-        <td class="p-3">¥${(+r.amount).toFixed(2)}</td>
-        <td class="p-3"><span class="px-2 py-1 rounded text-xs bg-green-100 text-green-700">已通过</span></td>
-      </tr>
-    `).join('') : '<tr><td colspan="5" class="p-3 text-center text-slate-400">暂无记录</td></tr>';
-  } catch (err) {
-    console.error('加载失败:', err);
+async function loadAll() {
+  const [depts,cats,budgets,reqs] = await Promise.all([
+    fetch(API+'/depts',{headers:{Authorization:'Bearer '+token}}).then(r=>r.json()),
+    fetch(API+'/categories',{headers:{Authorization:'Bearer '+token}}).then(r=>r.json()),
+    fetch(API+'/budgets',{headers:{Authorization:'Bearer '+token}}).then(r=>r.json()),
+    fetch(API+'/requests',{headers:{Authorization:'Bearer '+token}}).then(r=>r.json())
+  ]);
+  depts.forEach(d=>deptMap[d.dept_id]=d.display_name);
+  cats.forEach(c=>catMap[c.cat_id]=c.display_name);
+
+  const ds = document.getElementById('deptSel'); ds.innerHTML=''; depts.forEach(d=>ds.innerHTML+=`<option value="${d.dept_id}">${d.display_name}</option>`);
+  const cs = document.getElementById('catSel'); cs.innerHTML=''; cats.forEach(c=>cs.innerHTML+=`<option value="${c.cat_id}">${c.display_name}</option>`);
+  document.getElementById('bd').innerHTML=ds.innerHTML;
+  document.getElementById('bc').innerHTML=cs.innerHTML;
+
+  const dash = document.getElementById('dashboard'); dash.innerHTML='';
+  const group = {};
+  budgets.forEach(b=>{
+    if(!group[b.dept_id]) group[b.dept_id]={total:0,used:0};
+    group[b.dept_id].total += +b.total_amount;
+    group[b.dept_id].used += +b.used_amount;
+  });
+  for(const [id,v] of Object.entries(group)){
+    const pct = v.used/v.total*100||0;
+    const cls = pct>=90?'bar-red':pct>=80?'bar-yellow':'bar-green';
+    dash.innerHTML += `<div class="dash-card"><h3>${deptMap[id]||id}</h3><p style="font-size:20px;font-weight:bold;margin:6px 0">¥${v.used.toLocaleString()} / ${v.total.toLocaleString()}</p><p style="font-size:12px;color:#64748b">使用率${pct.toFixed(1)}%</p><div class="bar"><div class="bar-fill ${cls}" style="width:${pct}%"></div></div></div>`;
   }
+
+  document.getElementById('deptList').innerHTML = depts.map(d=>`<tr><td>${d.dept_id}</td><td>${d.display_name}</td><td>${user?.role==='admin'?`<button class="btn-sm btn-danger" onclick="delDept('${d.dept_id}')">删除</button>`:'无权限'}</td></tr>`).join('');
+  document.getElementById('catList').innerHTML = cats.map(c=>`<tr><td>${c.cat_id}</td><td>${c.display_name}</td><td>${user?.role==='admin'?`<button class="btn-sm btn-danger" onclick="delCat('${c.cat_id}')">删除</button>`:'无权限'}</td></tr>`).join('');
+  document.getElementById('records').innerHTML = reqs.length?reqs.map(r=>`<tr><td>${r.request_no}</td><td>${deptMap[r.dept_id]||r.dept_id}</td><td>${catMap[r.category]||r.category}</td><td>¥${(+r.amount).toFixed(2)}</td><td><span style="color:#16a34a">已通过</span></td><td>${(r.created_at||'').slice(0,16)}</td></tr>`).join(''):'<tr><td colspan="6" style="text-align:center;color:#94a3b8">暂无记录</td></tr>';
 }
 
-document.getElementById('form').addEventListener('submit', async e => {
+document.getElementById('applyForm').addEventListener('submit',async e=>{
   e.preventDefault();
-  const res = await fetch(API+'/requests', {
-    method:'POST', 
-    headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+  const res = await fetch(API+'/requests',{
+    method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
     body:JSON.stringify({
-      dept:document.getElementById('dept').value,
-      category:document.getElementById('cat').value,
+      dept:document.getElementById('deptSel').value,
+      category:document.getElementById('catSel').value,
       amount:+document.getElementById('amount').value,
       purpose:document.getElementById('purpose').value
     })
   });
   const d = await res.json();
-  const box = document.getElementById('msg');
-  box.classList.remove('hidden');
-  if (d.ok) {
-    box.className = 'mt-4 p-3 rounded-lg bg-green-50 text-green-700 border border-green-100';
-    box.textContent = `✅ 通过！申请单号：${d.no}，剩余额度¥${(d.remain || 0).toFixed(2)}`;
-  } else {
-    box.className = 'mt-4 p-3 rounded-lg bg-red-50 text-red-700 border border-red-100';
-    box.textContent = `❌ ${d.msg || '提交失败'}`;
-  }
-  loadData();
-  e.target.reset();
+  const box = document.getElementById('applyMsg');
+  box.className = 'msg '+(d.ok?'success':'error');
+  box.textContent = d.ok?`✅ 通过！单号${d.no}，剩余¥${d.remain.toFixed(2)}${d.warn?'\n'+d.warn:''}`:`❌ ${d.msg}`;
+  loadAll(); e.target.reset();
 });
 
-async function openChangePwd() {
-  const oldPwd = prompt('请输入原密码：');
-  if (!oldPwd) return;
-  const newPwd = prompt('请输入新密码（至少6位）：');
-  if (!newPwd) return;
-  const confirmPwd = prompt('请再次输入新密码：');
-  if (!confirmPwd) return;
-  
-  const res = await fetch('/user/password', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + token
-    },
-    body: JSON.stringify({ oldPwd, newPwd, confirmPwd })
+document.getElementById('deptForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  await fetch(API+'/depts',{
+    method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+    body:JSON.stringify({dept_id:document.getElementById('deptId').value,display_name:document.getElementById('deptName').value})
   });
-  
-  const data = await res.json();
-  alert(data.msg || data.message);
-  if (data.success) {
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    location.reload();
-  }
+  document.getElementById('deptId').value='';document.getElementById('deptName').value='';
+  loadAll();
+});
+document.getElementById('catForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  await fetch(API+'/categories',{
+    method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+    body:JSON.stringify({cat_id:document.getElementById('catId').value,display_name:document.getElementById('catName').value})
+  });
+  document.getElementById('catId').value='';document.getElementById('catName').value='';
+  loadAll();
+});
+document.getElementById('budgetForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  await fetch(API+'/budgets',{
+    method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+    body:JSON.stringify({
+      dept_id:document.getElementById('bd').value,
+      category_id:document.getElementById('bc').value,
+      total_amount:+document.getElementById('bt').value,
+      warning_rate:+document.getElementById('bw').value
+    })
+  });
+  loadAll(); alert('保存成功');
+});
+
+window.delDept = async id => { if(!confirm('确定删除？'))return; await fetch(`${API}/depts/${id}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}}); loadAll(); };
+window.delCat = async id => { if(!confirm('确定删除？'))return; await fetch(`${API}/categories/${id}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}}); loadAll(); };
+
+function openChangePwd() {
+  const oldPwd = prompt('请输入原密码：'); if(!oldPwd) return;
+  const newPwd = prompt('新密码（至少6位）：'); if(!newPwd) return;
+  const confirmPwd = prompt('确认新密码：'); if(!confirmPwd) return;
+  fetch('/user/password',{
+    method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+    body:JSON.stringify({oldPwd,newPwd,confirmPwd})
+  }).then(r=>r.json()).then(d=>{alert(d.msg);if(d.success)logout();});
 }
+
+function exportExcel() {
+  const a = document.createElement('a');
+  a.href = API+'/export/excel';
+  a.download = '预算导出.csv';
+  a.click();
+}
+
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    const v = t.dataset.view;
+    ['apply','dept','cat','budget'].forEach(k=>document.getElementById('v-'+k).classList.toggle('hidden',k!==v));
+  });
+});
 </script>
 </body>
 </html>

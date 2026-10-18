@@ -5,10 +5,13 @@ const bcrypt = require('bcryptjs');
 const cors = require('cors');
 require('dotenv').config();
 
+const userRouter = require('./routes/user');
+
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+app.use('/user', userRouter);
 
 const SECRET = process.env.JWT_SECRET || 'budget-secret-2026';
 
